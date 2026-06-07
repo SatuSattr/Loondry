@@ -27,7 +27,7 @@ php artisan migrate --seed
 php artisan serve
 ```
 
-Full API documentation is available at [`apps/api/readme.md`](.apps/api/readme.md).
+Full API documentation is available at [`apps/api/readme.md`](apps/api/readme.md).
 
 ### 2. Web Admin Dashboard
 
