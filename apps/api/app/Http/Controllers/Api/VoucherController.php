@@ -125,12 +125,12 @@ class VoucherController extends Controller
         ]);
 
         $operator = $request->user();
-        $user = $operator;
+        $targetUser = $operator;
 
         // If customer_id is provided, redeem on behalf of that customer
         if ($request->filled('customer_id') && in_array($operator->role, ['admin', 'operator'])) {
             $customer = \App\Models\Customer::with('user')->findOrFail($request->customer_id);
-            $user = $customer->user;
+            $targetUser = $customer->user;
         }
 
         $voucher = Voucher::findOrFail($request->voucher_id);
@@ -148,24 +148,31 @@ class VoucherController extends Controller
             return response()->json(['message' => 'Voucher period has expired'], 400);
         }
 
-        if ($user->points < $voucher->points_cost) {
-            return response()->json(['message' => 'Points insufficient'], 400);
-        }
-
         $voucherCode = strtoupper($voucher->code . '-' . Str::random(6));
 
-        $redemption = DB::transaction(function () use ($user, $voucher, $voucherCode) {
-            $user->decrement('points', $voucher->points_cost);
+        try {
+            $redemption = DB::transaction(function () use ($targetUser, $voucher, $voucherCode) {
+                // Lock the user row for update to prevent concurrent modification
+                $lockedUser = \App\Models\User::where('id', $targetUser->id)->lockForUpdate()->firstOrFail();
 
-            return PointsRedemption::create([
-                'user_id' => $user->id,
-                'voucher_id' => $voucher->id,
-                'voucher_code' => $voucherCode,
-                'points_spent' => $voucher->points_cost,
-                'discount_value' => $voucher->discount_value, // basic reference
-                'is_used' => false,
-            ]);
-        });
+                if ($lockedUser->points < $voucher->points_cost) {
+                    throw new \Exception('Points insufficient');
+                }
+
+                $lockedUser->decrement('points', $voucher->points_cost);
+
+                return PointsRedemption::create([
+                    'user_id' => $lockedUser->id,
+                    'voucher_id' => $voucher->id,
+                    'voucher_code' => $voucherCode,
+                    'points_spent' => $voucher->points_cost,
+                    'discount_value' => $voucher->discount_value,
+                    'is_used' => false,
+                ]);
+            });
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 400);
+        }
 
         return response()->json([
             'message' => 'Voucher redeemed successfully',
@@ -201,6 +208,14 @@ class VoucherController extends Controller
      */
     public function applyVoucher(Request $request, Transaction $transaction)
     {
+        $user = $request->user();
+        if ($user->role !== 'admin') {
+            $customer = $user->customer;
+            if (!$customer || $transaction->customer_id !== $customer->id) {
+                return response()->json(['message' => 'Unauthorized access to transaction.'], 403);
+            }
+        }
+
         $request->validate([
             'voucher_code' => ['required', 'string', 'exists:points_redemptions,voucher_code'],
         ]);

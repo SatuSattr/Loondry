@@ -88,10 +88,25 @@ class TransactionController extends Controller
     }
 
     /**
+     * Helper to verify user owns the transaction or is admin.
+     */
+    private function authorizeTransaction(Transaction $transaction)
+    {
+        $user = request()->user();
+        if ($user->role !== 'admin') {
+            $customer = $user->customer;
+            if (!$customer || $transaction->customer_id !== $customer->id) {
+                abort(response()->json(['message' => 'Unauthorized access to transaction.'], 403));
+            }
+        }
+    }
+
+    /**
      * Display the specified resource.
      */
     public function show(Transaction $transaction)
     {
+        $this->authorizeTransaction($transaction);
         return response()->json([
             'data' => $transaction->load(['customer.user', 'admin', 'service', 'logs', 'images']),
         ]);
@@ -147,6 +162,7 @@ class TransactionController extends Controller
      */
     public function uploadPaymentProof(Request $request, Transaction $transaction)
     {
+        $this->authorizeTransaction($transaction);
         $request->validate([
             'payment_proof' => ['required', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
         ]);
@@ -239,6 +255,7 @@ class TransactionController extends Controller
      */
     public function printReceipt(Transaction $transaction)
     {
+        $this->authorizeTransaction($transaction);
         $transaction->load(['customer.user', 'admin', 'service']);
 
         $pdf = Pdf::loadView('pdf.receipt', ['transaction' => $transaction]);
