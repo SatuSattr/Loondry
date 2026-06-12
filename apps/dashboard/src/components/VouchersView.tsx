@@ -11,8 +11,6 @@ import {
   Calendar,
   Layers,
   Activity,
-  CheckCircle2,
-  XCircle,
 } from 'lucide-react';
 import ErrorDialog from '@/components/shadcn-studio/blocks/dashboard-dialog-22/dialog-error';
 
@@ -30,6 +28,16 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
 
   // Search filter
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Display mode (cards vs table) for templates
+  const [displayMode, setDisplayMode] = useState<'cards' | 'table'>(() => {
+    return (localStorage.getItem('voucher_display_mode') as 'cards' | 'table') || 'cards';
+  });
+
+  const handleViewModeChange = (mode: 'cards' | 'table') => {
+    setDisplayMode(mode);
+    localStorage.setItem('voucher_display_mode', mode);
+  };
 
   const loadTemplates = async () => {
     setLoading(true);
@@ -145,9 +153,10 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
         </button>
       </div>
 
-      {/* Search Bar */}
-      <div className="bg-card border border-border rounded-xl p-4 shadow-xs">
-        <div className="relative">
+      {/* Search Bar & Optional View Toggle */}
+      <div className="bg-card border border-border rounded-xl p-4 shadow-xs flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 justify-between items-stretch md:items-center">
+        {/* Search */}
+        <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
@@ -161,6 +170,38 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
             className="w-full bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground"
           />
         </div>
+
+        {activeSubTab === 'templates' && (
+          <div className="flex items-center space-x-3 shrink-0">
+            {/* View Toggle */}
+            <div className="flex items-center space-x-1 bg-muted p-1 border border-border rounded-lg shrink-0 justify-center">
+              <button
+                onClick={() => handleViewModeChange('cards')}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer ${
+                  displayMode === 'cards'
+                    ? 'bg-background text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                title="Card View"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-layout-grid"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+                <span>Cards</span>
+              </button>
+              <button
+                onClick={() => handleViewModeChange('table')}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer ${
+                  displayMode === 'table'
+                    ? 'bg-background text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                title="Table View"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-table-properties"><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>
+                <span>Table</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Tab Contents */}
@@ -179,92 +220,199 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
           </button>
         </div>
       ) : activeSubTab === 'templates' ? (
-        /* Voucher Templates grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredTemplates.length > 0 ? (
-            filteredTemplates.map((v) => {
-              const formattedMinTx = v.min_transaction ? `Min. Spend: Rp ${Number(v.min_transaction).toLocaleString()}` : 'No Min. Spend';
-              const formattedMax = v.max_discount ? `Max. Cap: Rp ${Number(v.max_discount).toLocaleString()}` : 'Unlimited Cap';
-              const discountValueStr = v.discount_type === 'percentage' 
-                ? `${Number(v.discount_value)}% Off` 
-                : `Rp ${Number(v.discount_value).toLocaleString()} Off`;
-              
-              const dateRangeStr = (v.start_date || v.end_date) 
-                ? `Valid: ${v.start_date ? v.start_date.substring(0, 10) : 'Anytime'} to ${v.end_date ? v.end_date.substring(0, 10) : 'Forever'}`
-                : 'No Expiry Dates';
+        displayMode === 'cards' ? (
+          /* Voucher Templates grid */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {filteredTemplates.length > 0 ? (
+              filteredTemplates.map((v) => {
+                const formattedMinTx = v.min_transaction ? `Min. Spend: Rp ${Number(v.min_transaction).toLocaleString()}` : 'No Min. Spend';
+                const formattedMax = v.max_discount ? `Max. Cap: Rp ${Number(v.max_discount).toLocaleString()}` : 'Unlimited Cap';
+                const discountValueStr = v.discount_type === 'percentage' 
+                  ? `${Number(v.discount_value)}% Off` 
+                  : `Rp ${Number(v.discount_value).toLocaleString()} Off`;
+                
+                const dateRangeStr = (v.start_date || v.end_date) 
+                  ? `Valid: ${v.start_date ? v.start_date.substring(0, 10) : 'Anytime'} to ${v.end_date ? v.end_date.substring(0, 10) : 'Forever'}`
+                  : 'No Expiry Dates';
 
-              return (
-                <div
-                  key={v.id}
-                  className="bg-card border border-border rounded-xl p-5 shadow-xs flex flex-col justify-between hover:border-primary/40 hover:shadow-md transition-all space-y-4"
-                >
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-bold text-foreground text-base tracking-tight leading-tight">{v.name}</h3>
-                        <span className="text-[10px] font-mono bg-primary/10 text-primary font-bold px-2 py-0.5 rounded mt-1.5 inline-block uppercase tracking-wider">{v.code}</span>
+                return (
+                  <div
+                    key={v.id}
+                    className="bg-card border border-border rounded-xl p-5 shadow-xs flex flex-col justify-between hover:border-primary/40 hover:shadow-md transition-all space-y-4"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-bold text-foreground text-base tracking-tight leading-tight">{v.name}</h3>
+                          <span className="text-[10px] font-mono bg-primary/10 text-primary font-bold px-2 py-0.5 rounded mt-1.5 inline-block uppercase tracking-wider">{v.code}</span>
+                        </div>
+                        <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
+                          v.status === 'active' 
+                            ? 'bg-emerald-500/10 text-emerald-500' 
+                            : 'bg-muted text-muted-foreground'
+                        }`}>
+                          {v.status}
+                        </span>
                       </div>
-                      <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
-                        v.status === 'active' 
-                          ? 'bg-emerald-500/10 text-emerald-500' 
-                          : 'bg-muted text-muted-foreground'
-                      }`}>
-                        {v.status}
-                      </span>
+
+                      <div className="space-y-1.5 text-xs text-muted-foreground pt-1.5 border-t border-border/60">
+                        <div className="flex items-center space-x-2">
+                          <Percent className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="font-semibold text-foreground">{discountValueStr} ({formattedMax})</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span>{formattedMinTx}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <span className="text-[11px]">{dateRangeStr}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Activity className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="font-semibold text-emerald-500">Exchange Cost: {v.points_cost} pts</span>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="space-y-1.5 text-xs text-muted-foreground pt-1.5 border-t border-border/60">
-                      <div className="flex items-center space-x-2">
-                        <Percent className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="font-semibold text-foreground">{discountValueStr} ({formattedMax})</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span>{formattedMinTx}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                        <span className="text-[11px]">{dateRangeStr}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Activity className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="font-semibold text-emerald-500">Exchange Cost: {v.points_cost} pts</span>
-                      </div>
+                    <div className="flex space-x-2 pt-3 border-t border-border">
+                      <button
+                        onClick={() => onOpenEditVoucher(v)}
+                        className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/85 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                        <span>Edit Template</span>
+                      </button>
+                      <ErrorDialog
+                        title="Delete Voucher Template"
+                        description={`Are you sure you want to delete voucher template "${v.name}"? This won't affect already redeemed customer codes.`}
+                        onConfirm={() => handleDeleteTemplate(v)}
+                        showCheckbox={false}
+                        trigger={
+                          <button
+                            className="bg-destructive/10 text-destructive hover:bg-destructive/20 p-2 rounded-lg transition-colors cursor-pointer"
+                            title="Delete template"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        }
+                      />
                     </div>
                   </div>
+                );
+              })
+            ) : (
+              <div className="col-span-full text-center py-12 text-sm text-muted-foreground bg-muted/40 rounded-xl border border-dashed border-border">
+                {templates.length === 0 
+                  ? "No voucher templates found. Create a new template to start offering point exchanges."
+                  : "No voucher templates match your search query."}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Voucher Templates Table Layout */
+          <div className="bg-card border border-border rounded-xl shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40 text-muted-foreground text-xs uppercase tracking-wider">
+                    <th className="p-4">Voucher Name</th>
+                    <th className="p-4">Code</th>
+                    <th className="p-4">Discount</th>
+                    <th className="p-4">Min. Spend / Cap</th>
+                    <th className="p-4">Points Cost</th>
+                    <th className="p-4">Validity</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredTemplates.length > 0 ? (
+                    filteredTemplates.map((v) => {
+                      const formattedMinTx = v.min_transaction ? `Min: Rp ${Number(v.min_transaction).toLocaleString()}` : 'No Min';
+                      const formattedMax = v.max_discount ? `Cap: Rp ${Number(v.max_discount).toLocaleString()}` : 'No Cap';
+                      const discountValueStr = v.discount_type === 'percentage' 
+                        ? `${Number(v.discount_value)}% Off` 
+                        : `Rp ${Number(v.discount_value).toLocaleString()} Off`;
+                      
+                      const dateRangeStr = (v.start_date || v.end_date) 
+                        ? `${v.start_date ? v.start_date.substring(0, 10) : 'Anytime'} - ${v.end_date ? v.end_date.substring(0, 10) : 'Forever'}`
+                        : 'Lifetime';
 
-                  <div className="flex space-x-2 pt-3 border-t border-border">
-                    <button
-                      onClick={() => onOpenEditVoucher(v)}
-                      className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/85 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
-                    >
-                      <Edit className="h-3.5 w-3.5" />
-                      <span>Edit Template</span>
-                    </button>
-                    <ErrorDialog
-                      title="Delete Voucher Template"
-                      description={`Are you sure you want to delete voucher template "${v.name}"? This won't affect already redeemed customer codes.`}
-                      onConfirm={() => handleDeleteTemplate(v)}
-                      showCheckbox={false}
-                      trigger={
-                        <button
-                          className="bg-destructive/10 text-destructive hover:bg-destructive/20 p-2 rounded-lg transition-colors cursor-pointer"
-                          title="Delete template"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      }
-                    />
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="col-span-full text-center py-12 text-sm text-muted-foreground bg-muted/40 rounded-xl border border-dashed border-border">
-              No voucher templates found. Create a new template to start offering point exchanges.
+                      return (
+                        <tr key={v.id} className="hover:bg-accent/25 text-foreground transition-all">
+                          <td className="p-4 font-semibold text-sm">
+                            {v.name}
+                          </td>
+                          <td className="p-4">
+                            <span className="text-[10px] font-mono bg-primary/10 text-primary font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+                              {v.code}
+                            </span>
+                          </td>
+                          <td className="p-4 font-medium text-foreground">
+                            {discountValueStr}
+                          </td>
+                          <td className="p-4 text-xs text-muted-foreground">
+                            <p>{formattedMinTx}</p>
+                            <p>{formattedMax}</p>
+                          </td>
+                          <td className="p-4 font-semibold text-emerald-500 text-xs">
+                            {v.points_cost} pts
+                          </td>
+                          <td className="p-4 text-xs text-muted-foreground">
+                            {dateRangeStr}
+                          </td>
+                          <td className="p-4">
+                            <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
+                              v.status === 'active' 
+                                ? 'bg-emerald-500/10 text-emerald-500' 
+                                : 'bg-muted text-muted-foreground'
+                            }`}>
+                              {v.status}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center justify-center space-x-1.5">
+                              <button
+                                onClick={() => onOpenEditVoucher(v)}
+                                className="p-1.5 rounded-md border border-border bg-background hover:bg-accent text-foreground transition-all cursor-pointer"
+                                title="Edit voucher template"
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                              </button>
+                              <ErrorDialog
+                                title="Delete Voucher Template"
+                                description={`Are you sure you want to delete voucher template "${v.name}"? This won't affect already redeemed customer codes.`}
+                                onConfirm={() => handleDeleteTemplate(v)}
+                                showCheckbox={false}
+                                trigger={
+                                  <button
+                                    className="p-1.5 rounded-md border border-destructive/20 bg-destructive/10 hover:bg-destructive/20 text-destructive transition-all cursor-pointer"
+                                    title="Delete template"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                }
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="p-8 text-center text-sm text-muted-foreground">
+                        {templates.length === 0 
+                          ? "No voucher templates found. Create a new template to start offering point exchanges."
+                          : "No voucher templates match your search query."}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-          )}
-        </div>
+          </div>
+        )
       ) : (
         /* Redemptions Log List */
         <div className="bg-card border border-border rounded-xl shadow-xs overflow-hidden">
@@ -305,37 +453,29 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
                           <span className="text-xs text-muted-foreground">Legacy flat Rp {Number(h.discount_value).toLocaleString()} discount</span>
                         )}
                       </td>
-                      <td className="p-4 font-semibold">
+                      <td className="p-4 font-semibold text-foreground">
                         {h.points_spent} pts
                       </td>
                       <td className="p-4">
-                        {h.is_used ? (
-                          <span className="inline-flex items-center text-xs font-semibold text-muted-foreground bg-muted border border-border px-2 py-0.5 rounded-full space-x-1">
-                            <XCircle className="h-3.5 w-3.5 opacity-60" />
-                            <span>Used ({new Date(h.used_at).toLocaleDateString()})</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center text-xs font-semibold text-emerald-500 bg-emerald-500/10 border border-emerald-500/10 px-2 py-0.5 rounded-full space-x-1">
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                            <span>Available</span>
-                          </span>
-                        )}
+                        <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
+                          h.is_used 
+                            ? 'bg-muted text-muted-foreground' 
+                            : 'bg-emerald-500/10 text-emerald-500'
+                        }`}>
+                          {h.is_used ? 'Used' : 'Active'}
+                        </span>
                       </td>
                       <td className="p-4 text-xs text-muted-foreground">
-                        {new Date(h.created_at).toLocaleDateString(undefined, {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
+                        {h.created_at ? h.created_at.replace('T', ' ').substring(0, 16) : '-'}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-xs text-muted-foreground">
-                      No redeemed vouchers logs found.
+                    <td colSpan={6} className="p-8 text-center text-sm text-muted-foreground">
+                      {history.length === 0 
+                        ? "No redemption history logs found."
+                        : "No redemptions match your search query."}
                     </td>
                   </tr>
                 )}

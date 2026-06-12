@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
-import { Loader2, Edit, Trash2, PlusCircle, RefreshCw, Layers } from 'lucide-react';
+import { Loader2, Edit, Trash2, PlusCircle, RefreshCw, Layers, Search } from 'lucide-react';
 import ErrorDialog from '@/components/shadcn-studio/blocks/dashboard-dialog-22/dialog-error';
 
 interface ServicesViewProps {
@@ -12,6 +12,28 @@ export function ServicesView({ onOpenCreateService, onOpenEditService }: Service
   const [services, setServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Display mode (cards vs table)
+  const [displayMode, setDisplayMode] = useState<'cards' | 'table'>(() => {
+    return (localStorage.getItem('service_display_mode') as 'cards' | 'table') || 'cards';
+  });
+
+  const handleViewModeChange = (mode: 'cards' | 'table') => {
+    setDisplayMode(mode);
+    localStorage.setItem('service_display_mode', mode);
+  };
+
+  // Handle debounce search
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(delayDebounce);
+  }, [searchQuery]);
 
   const loadServices = async () => {
     setLoading(true);
@@ -39,6 +61,12 @@ export function ServicesView({ onOpenCreateService, onOpenEditService }: Service
     }
   };
 
+  // Filter services client-side based on search query
+  const filteredServices = services.filter((s) =>
+    s.service_name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+    s.unit.toLowerCase().includes(debouncedSearch.toLowerCase())
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -65,7 +93,52 @@ export function ServicesView({ onOpenCreateService, onOpenEditService }: Service
         </div>
       </div>
 
-      {/* Main Grid */}
+      {/* Filters & Actions Bar */}
+      <div className="bg-card border border-border rounded-xl p-4 shadow-xs flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 justify-between items-stretch md:items-center">
+        {/* Search */}
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search services by name or unit..."
+            className="w-full bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground"
+          />
+        </div>
+
+        <div className="flex items-center space-x-3 shrink-0">
+          {/* View Toggle */}
+          <div className="flex items-center space-x-1 bg-muted p-1 border border-border rounded-lg shrink-0 justify-center">
+            <button
+              onClick={() => handleViewModeChange('cards')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer ${
+                displayMode === 'cards'
+                  ? 'bg-background text-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              title="Card View"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-layout-grid"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+              <span>Cards</span>
+            </button>
+            <button
+              onClick={() => handleViewModeChange('table')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer ${
+                displayMode === 'table'
+                  ? 'bg-background text-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              title="Table View"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-table-properties"><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>
+              <span>Table</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
       {loading ? (
         <div className="flex items-center justify-center min-h-60">
           <Loader2 className="animate-spin h-8 w-8 text-primary" />
@@ -80,10 +153,11 @@ export function ServicesView({ onOpenCreateService, onOpenEditService }: Service
             Retry
           </button>
         </div>
-      ) : (
+      ) : displayMode === 'cards' ? (
+        /* Card Layout */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {services.length > 0 ? (
-            services.map((s) => (
+          {filteredServices.length > 0 ? (
+            filteredServices.map((s) => (
               <div
                 key={s.id}
                 className="bg-card border border-border rounded-xl p-5 shadow-xs flex flex-col justify-between hover:border-primary/40 hover:shadow-md transition-all space-y-4"
@@ -145,9 +219,87 @@ export function ServicesView({ onOpenCreateService, onOpenEditService }: Service
             ))
           ) : (
             <div className="col-span-full text-center py-12 text-sm text-muted-foreground bg-muted/40 rounded-xl border border-dashed border-border">
-              No laundry services found in catalog. Create a new service above.
+              {services.length === 0 
+                ? "No services found in catalog. Create a new service above."
+                : "No laundry services match your search query."}
             </div>
           )}
+        </div>
+      ) : (
+        /* Table Layout */
+        <div className="bg-card border border-border rounded-xl shadow-xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/40 text-muted-foreground text-xs uppercase tracking-wider">
+                  <th className="p-4">Service Name</th>
+                  <th className="p-4">Unit</th>
+                  <th className="p-4">Price / Rate</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filteredServices.length > 0 ? (
+                  filteredServices.map((s) => (
+                    <tr key={s.id} className="hover:bg-accent/25 text-foreground transition-all">
+                      <td className="p-4 font-semibold text-sm">
+                        {s.service_name}
+                      </td>
+                      <td className="p-4 text-sm text-muted-foreground">
+                        {s.unit}
+                      </td>
+                      <td className="p-4 font-medium text-foreground">
+                        Rp {Number(s.price).toLocaleString()}
+                      </td>
+                      <td className="p-4">
+                        <span className={`text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full ${
+                          s.status === 'active'
+                            ? 'bg-emerald-500/10 text-emerald-500'
+                            : 'bg-destructive/10 text-destructive'
+                        }`}>
+                          {s.status}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center justify-center space-x-1.5">
+                          <button
+                            onClick={() => onOpenEditService(s)}
+                            className="p-1.5 rounded-md border border-border bg-background hover:bg-accent text-foreground transition-all cursor-pointer"
+                            title="Edit service details"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </button>
+                          <ErrorDialog
+                            title="Delete Service"
+                            description={`Are you sure you want to delete service "${s.service_name}"?`}
+                            onConfirm={() => handleDelete(s)}
+                            showCheckbox={false}
+                            trigger={
+                              <button
+                                className="p-1.5 rounded-md border border-destructive/20 bg-destructive/10 hover:bg-destructive/20 text-destructive transition-all cursor-pointer"
+                                title="Delete service"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            }
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">
+                      {services.length === 0 
+                        ? "No services found in catalog. Create a new service above."
+                        : "No laundry services match your search query."}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
