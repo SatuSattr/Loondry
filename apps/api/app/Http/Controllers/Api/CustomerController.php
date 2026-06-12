@@ -100,9 +100,11 @@ class CustomerController extends Controller
                 $userData['password'] = Hash::make($request->password);
             }
 
-            $customer->user->update(array_filter($userData, function ($value) {
-                return $value !== null;
-            }));
+            if ($customer->user) {
+                $customer->user->update(array_filter($userData, function ($value) {
+                    return $value !== null;
+                }));
+            }
 
             $customerData = $request->only(['phone', 'address']);
             $customer->update(array_filter($customerData, function ($value) {

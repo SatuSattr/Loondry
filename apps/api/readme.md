@@ -8,6 +8,16 @@ Laundry in Your Pocket.
 
 ---
 
+## Default Admin Credentials
+
+| Field | Value |
+|-------|-------|
+| Email | `admin@loondry.com` |
+| Password | `password` |
+| Role | admin |
+
+---
+
 ## Documentation Index
 
 Each endpoint group is documented in a separate file under the `documentation/` folder.
@@ -22,6 +32,7 @@ Each endpoint group is documented in a separate file under the `documentation/` 
 | 6 | **Reports** — revenue report, statistics report | [`documentation/06-reports.md`](documentation/06-reports.md) |
 | 7 | **Error Responses** — standard error formats (401, 403, 422, 404) | [`documentation/07-errors.md`](documentation/07-errors.md) |
 | 8 | **Entity Relationship** — database schema summary, relations, eager-loaded data | [`documentation/08-entity-relationship.md`](documentation/08-entity-relationship.md) |
+| 9 | **Points & Vouchers** — loyalty points, redeem vouchers, apply discounts | [`documentation/09-points-and-vouchers.md`](documentation/09-points-and-vouchers.md) |
 
 ---
 
@@ -56,3 +67,13 @@ Each endpoint group is documented in a separate file under the `documentation/` 
 | GET | `/api/status-laundry` | Sanctum | customer |
 | GET | `/api/reports/revenue` | Sanctum | admin |
 | GET | `/api/reports/statistics` | Sanctum | admin |
+| GET | `/api/points` | Sanctum | - |
+| POST | `/api/vouchers/redeem` | Sanctum | - |
+| GET | `/api/vouchers` | Sanctum | - |
+| POST | `/api/transactions/{transaction}/apply-voucher` | Sanctum | admin |
+| GET | `/api/admin/vouchers` | Sanctum | admin |
+| GET | `/api/vouchers-templates` | Sanctum | admin |
+| POST | `/api/vouchers-templates` | Sanctum | admin |
+| GET | `/api/vouchers-templates/{template}` | Sanctum | admin |
+| PUT | `/api/vouchers-templates/{template}` | Sanctum | admin |
+| DELETE | `/api/vouchers-templates/{template}` | Sanctum | admin |

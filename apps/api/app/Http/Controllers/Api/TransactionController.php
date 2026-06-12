@@ -35,25 +35,45 @@ class TransactionController extends Controller
     public function store(TransactionRequest $request)
     {
         $service = Service::findOrFail($request->service_id);
-        $total_price = $service->price * $request->weight;
+        $raw_total = $service->price * $request->weight;
+        $points_earned = intdiv($raw_total, config('points.earn_per')) * config('points.earn_rate');
 
         // Generate invoice code: LND-NNN (sequential, e.g. LND-001)
-        $lastTransaction = Transaction::latest()->first();
-        $id = $lastTransaction ? $lastTransaction->id + 1 : 1;
+        $maxId = Transaction::max('id') ?: 0;
+        $id = $maxId + 1;
         $invoice_code = 'LND-' . str_pad($id, 3, '0', STR_PAD_LEFT);
 
-        $transaction = DB::transaction(function () use ($request, $invoice_code, $total_price) {
+        $transaction = DB::transaction(function () use ($request, $invoice_code, $raw_total, $points_earned) {
+            $paymentStatus = 'pending';
+            $paidAt = null;
+            $proofPath = null;
+
+            if ($request->payment_method === 'transfer' && $request->hasFile('payment_proof')) {
+                $proofPath = $request->file('payment_proof')->store('payment_proofs', 'public');
+                $paymentStatus = 'paid';
+                $paidAt = now();
+            }
+
             $transaction = Transaction::create([
                 'invoice_code' => $invoice_code,
                 'admin_id' => $request->user()->id,
                 'customer_id' => $request->customer_id,
                 'service_id' => $request->service_id,
                 'weight' => $request->weight,
-                'total_price' => $total_price,
+                'total_price' => $raw_total,
                 'status' => 'antrian',
                 'payment_method' => $request->payment_method,
-                'payment_status' => 'pending',
+                'payment_status' => $paymentStatus,
+                'payment_proof' => $proofPath,
+                'paid_at' => $paidAt,
+                'points_earned' => $points_earned,
             ]);
+
+            // If paid, increment points for customer
+            if ($paymentStatus === 'paid') {
+                $customerUser = $transaction->customer->user;
+                $customerUser->increment('points', $points_earned);
+            }
 
             // Log initial status
             $transaction->logs()->create(['status' => 'antrian']);
@@ -137,21 +157,29 @@ class TransactionController extends Controller
 
         $path = $request->file('payment_proof')->store('payment_proofs', 'public');
 
-        $transaction->update([
-            'payment_proof' => $path,
-            'payment_status' => 'paid',
-            'paid_at' => now(),
-        ]);
+        DB::transaction(function () use ($path, $transaction) {
+            $transaction->update([
+                'payment_proof' => $path,
+                'payment_status' => 'paid',
+                'paid_at' => now(),
+            ]);
 
-        // Generate PDF and send Email
+            $customerUser = $transaction->customer->user;
+            $customerUser->increment('points', $transaction->points_earned);
+        });
+
         $transaction->load(['customer.user', 'admin', 'service']);
-        $pdf = Pdf::loadView('pdf.receipt', ['transaction' => $transaction]);
-        $pdfContent = $pdf->output();
 
-        Mail::to($transaction->customer->user->email)->send(new TransactionReceiptMail($transaction, $pdfContent));
+        try {
+            $pdf = Pdf::loadView('pdf.receipt', ['transaction' => $transaction]);
+            $pdfContent = $pdf->output();
+            Mail::to($transaction->customer->user->email)->send(new TransactionReceiptMail($transaction, $pdfContent));
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Receipt email failed: ' . $e->getMessage());
+        }
 
         return response()->json([
-            'message' => 'Payment proof uploaded and receipt sent to email successfully',
+            'message' => 'Payment proof uploaded, points awarded, and receipt sent to email successfully',
             'data' => $transaction,
         ]);
     }

@@ -81,9 +81,21 @@
             <span style="float: right;">Rp {{ number_format($transaction->total_price, 0, ',', '.') }}</span>
             <div style="clear: both;"></div>
         </div>
+@if ($transaction->discount > 0)
+        <div class="total-row" style="color: #E53E3E;">
+            <span style="float: left;">Diskon Voucher</span>
+            <span style="float: right;">- Rp {{ number_format($transaction->discount, 0, ',', '.') }}</span>
+            <div style="clear: both;"></div>
+        </div>
+        <div class="total-row" style="color: #718096;">
+            <span style="float: left;">Total Setelah Diskon</span>
+            <span style="float: right;">Rp {{ number_format($transaction->total_price - $transaction->discount, 0, ',', '.') }}</span>
+            <div style="clear: both;"></div>
+        </div>
+@endif
         <div class="total-row grand-total">
             <span style="float: left;">LUNAS</span>
-            <span style="float: right;">Rp {{ number_format($transaction->total_price, 0, ',', '.') }}</span>
+            <span style="float: right;">Rp {{ number_format($transaction->total_price - $transaction->discount, 0, ',', '.') }}</span>
             <div style="clear: both;"></div>
         </div>
     </div>

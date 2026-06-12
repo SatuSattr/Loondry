@@ -19,6 +19,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'payment_status',
     'payment_proof',
     'paid_at',
+    'points_earned',
+    'voucher_code',
+    'discount',
 ])]
 class Transaction extends Model
 {
@@ -75,6 +78,7 @@ class Transaction extends Model
         return [
             'paid_at' => 'datetime',
             'total_price' => 'decimal:2',
+            'discount' => 'decimal:2',
         ];
     }
 }

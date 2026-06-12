@@ -41,7 +41,8 @@ class CustomerRequest extends FormRequest
                 }
             }
 
-            $rules['email'] = ['sometimes', 'required', 'string', 'email', 'max:255', 'unique:users,email,' . $customer->user_id];
+            $userId = ($customer instanceof \App\Models\Customer) ? $customer->user_id : null;
+            $rules['email'] = ['sometimes', 'required', 'string', 'email', 'max:255', 'unique:users,email,' . $userId];
             $rules['password'] = ['nullable', 'string', 'min:8'];
         }
 

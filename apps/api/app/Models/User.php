@@ -13,7 +13,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password', 'role', 'birth_date', 'religion', 'gender'])]
+#[Fillable(['name', 'email', 'password', 'role', 'birth_date', 'religion', 'gender', 'points'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -66,6 +66,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function transactions(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(Transaction::class, 'admin_id');
+    }
+
+    public function redemptions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(PointsRedemption::class);
     }
 
     /**

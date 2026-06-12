@@ -5,7 +5,10 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ServiceController;
 use App\Http\Controllers\Api\TransactionController;
+use App\Http\Controllers\Api\VoucherController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/health', fn () => response()->json(['status' => 'ok']));
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -29,10 +32,21 @@ Route::middleware('auth:sanctum')->group(function () {
         
         Route::get('/reports/revenue', [TransactionController::class, 'revenueReport']);
         Route::get('/reports/statistics', [TransactionController::class, 'statisticsReport']);
+
+        Route::apiResource('vouchers-templates', VoucherController::class)->parameters([
+            'vouchers-templates' => 'voucher'
+        ]);
+        Route::get('/admin/vouchers', [VoucherController::class, 'allVouchers']);
     });
 
     // Customer self-service routes
     Route::put('/profile/customer', [\App\Http\Controllers\Api\ProfileController::class, 'updateCustomer']);
+
+    // Points & Voucher routes
+    Route::get('/points', [VoucherController::class, 'pointsBalance']);
+    Route::post('/vouchers/redeem', [VoucherController::class, 'redeem']);
+    Route::get('/vouchers', [VoucherController::class, 'myVouchers']);
+    Route::post('/transactions/{transaction}/apply-voucher', [VoucherController::class, 'applyVoucher']);
 
     // Shared or Customer routes
     Route::get('/transactions/{transaction}', [TransactionController::class, 'show']);

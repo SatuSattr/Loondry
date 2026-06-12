@@ -49,5 +49,4 @@ npx expo start
 
 - Node.js >= 20
 - PHP >= 8.2 + Composer
-- MySQL / MariaDB
 - Expo Go (mobile testing)
