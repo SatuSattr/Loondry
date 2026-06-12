@@ -93,10 +93,10 @@ export function ServicesView({ onOpenCreateService, onOpenEditService }: Service
         </div>
       </div>
 
-      {/* Filters & Actions Bar */}
-      <div className="bg-card border border-border rounded-xl p-4 shadow-xs flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 justify-between items-stretch md:items-center">
-        {/* Search */}
-        <div className="relative flex-1 max-w-md">
+      {/* Search & Layout Toggle Bar */}
+      <div className="bg-card border border-border rounded-xl p-4 shadow-xs flex flex-col md:flex-row gap-4 items-center justify-between">
+        {/* Search Input */}
+        <div className="relative w-full md:flex-1">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
@@ -107,7 +107,8 @@ export function ServicesView({ onOpenCreateService, onOpenEditService }: Service
           />
         </div>
 
-        <div className="flex items-center space-x-3 shrink-0">
+        {/* Actions & View Toggle */}
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-start md:justify-end shrink-0">
           {/* View Toggle */}
           <div className="flex items-center space-x-1 bg-muted p-1 border border-border rounded-lg shrink-0 justify-center">
             <button

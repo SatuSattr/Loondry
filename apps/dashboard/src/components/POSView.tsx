@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, getAuthToken } from '../lib/api';
-import { Search, Loader2, CreditCard, Ticket, Printer, RefreshCw, ChevronDown } from 'lucide-react';
+import { Search, Loader2, CreditCard, Ticket, Printer, RefreshCw, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -153,10 +153,10 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
         </div>
       </div>
 
-      {/* Search and Filters Bar */}
-      <div className="bg-card border border-border rounded-xl p-4 shadow-xs space-y-3 sm:space-y-0 sm:flex sm:items-center sm:space-x-3">
+      {/* Search & Filters Bar */}
+      <div className="bg-card border border-border rounded-xl p-4 shadow-xs flex flex-col sm:flex-row gap-4 items-center justify-between">
         {/* Search */}
-        <div className="relative flex-1">
+        <div className="relative w-full sm:flex-1">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
@@ -167,64 +167,70 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
           />
         </div>
 
-        {/* Status Filter */}
-        <div className="w-full sm:w-48">
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-start sm:justify-end shrink-0">
+          {/* Status Filter */}
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
-                <Button
-                  variant="outline"
-                  className="w-full justify-between h-9 text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
-                >
-                  <span>{statusLabels[statusFilter]}</span>
-                  <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                <Button variant="outline" size="sm" className="h-9 gap-1.5 cursor-pointer text-xs font-semibold text-foreground">
+                  <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>Status: {statusFilter === 'all' ? 'All' : statusLabels[statusFilter]}</span>
                 </Button>
               }
             />
-            <DropdownMenuContent className="w-48 bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
+            <DropdownMenuContent align="end" className="w-48 bg-card border border-border text-foreground">
               {Object.entries(statusLabels).map(([key, val]) => (
                 <DropdownMenuItem
                   key={key}
                   onClick={() => setStatusFilter(key)}
-                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
-                    statusFilter === key ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
-                  }`}
+                  className="cursor-pointer hover:bg-accent hover:text-accent-foreground text-xs"
                 >
                   {val}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
 
-        {/* Payment Filter */}
-        <div className="w-full sm:w-40">
+          {/* Payment Filter */}
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
-                <Button
-                  variant="outline"
-                  className="w-full justify-between h-9 text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
-                >
-                  <span>{paymentLabels[paymentFilter]}</span>
-                  <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                <Button variant="outline" size="sm" className="h-9 gap-1.5 cursor-pointer text-xs font-semibold text-foreground">
+                  <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>Payment: {paymentFilter === 'all' ? 'All' : paymentLabels[paymentFilter]}</span>
                 </Button>
               }
             />
-            <DropdownMenuContent className="w-40 bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
+            <DropdownMenuContent align="end" className="w-40 bg-card border border-border text-foreground">
               {Object.entries(paymentLabels).map(([key, val]) => (
                 <DropdownMenuItem
                   key={key}
                   onClick={() => setPaymentFilter(key)}
-                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
-                    paymentFilter === key ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
-                  }`}
+                  className="cursor-pointer hover:bg-accent hover:text-accent-foreground text-xs"
                 >
                   {val}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Clear Filters */}
+          {(statusFilter !== 'all' || paymentFilter !== 'all') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setStatusFilter('all');
+                setPaymentFilter('all');
+              }}
+              className="h-9 px-2.5 text-muted-foreground hover:text-foreground hover:bg-accent/50 cursor-pointer text-xs"
+              title="Clear all filters"
+            >
+              <X className="h-4 w-4 mr-1 text-muted-foreground" />
+              Clear
+            </Button>
+          )}
         </div>
       </div>
 
