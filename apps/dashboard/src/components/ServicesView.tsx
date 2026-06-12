@@ -61,6 +61,29 @@ export function ServicesView({ onOpenCreateService, onOpenEditService }: Service
     }
   };
 
+  // Selection states for bulk actions
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  // Clear selection on filter or display mode changes
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [displayMode, searchQuery]);
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true);
+    setError('');
+    try {
+      await Promise.all(selectedIds.map((id) => api.deleteService(id)));
+      setServices((prev) => prev.filter((s) => !selectedIds.includes(s.id)));
+      setSelectedIds([]);
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete selected services');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   // Filter services client-side based on search query
   const filteredServices = services.filter((s) =>
     s.service_name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
@@ -233,6 +256,20 @@ export function ServicesView({ onOpenCreateService, onOpenEditService }: Service
             <table className="w-full text-left border-collapse text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/40 text-muted-foreground text-xs uppercase tracking-wider">
+                  <th className="p-4 w-12 text-center">
+                    <input
+                      type="checkbox"
+                      checked={filteredServices.length > 0 && selectedIds.length === filteredServices.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIds(filteredServices.map((s) => s.id));
+                        } else {
+                          setSelectedIds([]);
+                        }
+                      }}
+                      className="rounded border-border text-primary cursor-pointer h-4 w-4 focus:ring-ring bg-background"
+                    />
+                  </th>
                   <th className="p-4">Service Name</th>
                   <th className="p-4">Unit</th>
                   <th className="p-4">Price / Rate</th>
@@ -243,7 +280,26 @@ export function ServicesView({ onOpenCreateService, onOpenEditService }: Service
               <tbody className="divide-y divide-border">
                 {filteredServices.length > 0 ? (
                   filteredServices.map((s) => (
-                    <tr key={s.id} className="hover:bg-accent/25 text-foreground transition-all">
+                    <tr
+                      key={s.id}
+                      className={`hover:bg-accent/25 text-foreground transition-all ${
+                        selectedIds.includes(s.id) ? 'bg-primary/5 hover:bg-primary/10' : ''
+                      }`}
+                    >
+                      <td className="p-4 w-12 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(s.id)}
+                          onChange={() => {
+                            setSelectedIds((prev) =>
+                              prev.includes(s.id)
+                                ? prev.filter((id) => id !== s.id)
+                                : [...prev, s.id]
+                            );
+                          }}
+                          className="rounded border-border text-primary cursor-pointer h-4 w-4 focus:ring-ring bg-background"
+                        />
+                      </td>
                       <td className="p-4 font-semibold text-sm">
                         {s.service_name}
                       </td>
@@ -291,7 +347,7 @@ export function ServicesView({ onOpenCreateService, onOpenEditService }: Service
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">
+                    <td colSpan={6} className="p-8 text-center text-sm text-muted-foreground">
                       {services.length === 0 
                         ? "No services found in catalog. Create a new service above."
                         : "No laundry services match your search query."}
@@ -300,6 +356,43 @@ export function ServicesView({ onOpenCreateService, onOpenEditService }: Service
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Bulk Action Bar */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-card/90 backdrop-blur-md border border-border px-6 py-3.5 rounded-2xl shadow-xl z-50 flex items-center space-x-6 animate-in slide-in-from-bottom-4 duration-300">
+          <span className="text-xs font-semibold text-foreground">
+            {selectedIds.length} service{selectedIds.length > 1 ? 's' : ''} selected
+          </span>
+          <div className="h-4 w-px bg-border" />
+          <div className="flex items-center space-x-2">
+            <ErrorDialog
+              title="Delete Selected Services"
+              description={`Are you sure you want to delete ${selectedIds.length} selected laundry service(s)?`}
+              onConfirm={handleBulkDelete}
+              showCheckbox={false}
+              trigger={
+                <button
+                  disabled={bulkDeleting}
+                  className="bg-destructive hover:bg-destructive/90 text-destructive-foreground px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {bulkDeleting ? (
+                    <Loader2 className="animate-spin h-3.5 w-3.5" />
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5" />
+                  )}
+                  <span>{bulkDeleting ? 'Deleting...' : 'Delete Selected'}</span>
+                </button>
+              }
+            />
+            <button
+              onClick={() => setSelectedIds([])}
+              className="bg-secondary text-secondary-foreground hover:bg-secondary/85 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
