@@ -49,6 +49,7 @@ type SlideOverType =
   | 'create-voucher'
   | 'edit-voucher'
   | 'redeem-voucher'
+  | 'shortcuts-info'
   | null;
 
 export default function App() {
@@ -264,6 +265,8 @@ export default function App() {
   // Drawer Title helper
   const getSlideOverTitle = () => {
     switch (slideOverType) {
+      case 'shortcuts-info':
+        return 'Keyboard Shortcuts';
       case 'create-order':
         return 'New Laundry Order';
       case 'create-customer':
@@ -320,6 +323,7 @@ export default function App() {
               setActiveItem(tx);
               setSlideOverType('payment-proof');
             }}
+            onOpenShortcuts={() => setSlideOverType('shortcuts-info')}
           />
         );
       case 'customers':
@@ -804,6 +808,67 @@ export default function App() {
               setActiveItem(null);
             }}
           />
+        )}
+
+        {slideOverType === 'shortcuts-info' && (
+          <div className="space-y-5 text-sm text-foreground">
+            <p className="text-muted-foreground leading-relaxed">
+              Use these global keyboard shortcuts to navigate and manage tasks faster.
+            </p>
+            <div className="divide-y divide-border border border-border rounded-xl overflow-hidden bg-muted/30">
+              <div className="flex justify-between p-3.5 items-center">
+                <span className="font-semibold text-xs tracking-wide uppercase text-muted-foreground">Action</span>
+                <span className="font-semibold text-xs tracking-wide uppercase text-muted-foreground">Shortcut</span>
+              </div>
+              <div className="flex justify-between p-3.5">
+                <span className="font-medium text-foreground/90">New Laundry Order</span>
+                <kbd className="px-2 py-1 bg-background border border-border rounded-lg text-xs font-mono font-bold shadow-xs">F2 / Alt + N</kbd>
+              </div>
+              <div className="flex justify-between p-3.5">
+                <span className="font-medium text-foreground/90">Register New Customer</span>
+                <kbd className="px-2 py-1 bg-background border border-border rounded-lg text-xs font-mono font-bold shadow-xs">F3 / Alt + C</kbd>
+              </div>
+              <div className="flex justify-between p-3.5">
+                <span className="font-medium text-foreground/90">Focus Search Input</span>
+                <kbd className="px-2 py-1 bg-background border border-border rounded-lg text-xs font-mono font-bold shadow-xs">/</kbd>
+              </div>
+              <div className="flex justify-between p-3.5">
+                <span className="font-medium text-foreground/90">Switch to Dashboard</span>
+                <kbd className="px-2 py-1 bg-background border border-border rounded-lg text-xs font-mono font-bold shadow-xs">Alt + 1</kbd>
+              </div>
+              <div className="flex justify-between p-3.5">
+                <span className="font-medium text-foreground/90">Switch to Transactions</span>
+                <kbd className="px-2 py-1 bg-background border border-border rounded-lg text-xs font-mono font-bold shadow-xs">Alt + 2</kbd>
+              </div>
+              <div className="flex justify-between p-3.5">
+                <span className="font-medium text-foreground/90">Switch to Customers</span>
+                <kbd className="px-2 py-1 bg-background border border-border rounded-lg text-xs font-mono font-bold shadow-xs">Alt + 3</kbd>
+              </div>
+              <div className="flex justify-between p-3.5">
+                <span className="font-medium text-foreground/90">Switch to Services</span>
+                <kbd className="px-2 py-1 bg-background border border-border rounded-lg text-xs font-mono font-bold shadow-xs">Alt + 4</kbd>
+              </div>
+              <div className="flex justify-between p-3.5">
+                <span className="font-medium text-foreground/90">Switch to Vouchers</span>
+                <kbd className="px-2 py-1 bg-background border border-border rounded-lg text-xs font-mono font-bold shadow-xs">Alt + 5</kbd>
+              </div>
+              <div className="flex justify-between p-3.5">
+                <span className="font-medium text-foreground/90">Submit Active Form</span>
+                <kbd className="px-2 py-1 bg-background border border-border rounded-lg text-xs font-mono font-bold shadow-xs">Ctrl + Enter</kbd>
+              </div>
+              <div className="flex justify-between p-3.5">
+                <span className="font-medium text-foreground/90">Close Active Drawer</span>
+                <kbd className="px-2 py-1 bg-background border border-border rounded-lg text-xs font-mono font-bold shadow-xs">Esc</kbd>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSlideOverType(null)}
+              className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/80 py-2 px-4 rounded-lg font-semibold text-sm transition-colors mt-6 cursor-pointer text-center"
+            >
+              Close
+            </button>
+          </div>
         )}
       </SlideOver>
     </div>

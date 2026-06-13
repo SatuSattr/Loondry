@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, getAuthToken, API_BASE } from '../lib/api';
-import { Search, Loader2, CreditCard, Ticket, Printer, RefreshCw, SlidersHorizontal, X, ChevronDown, Camera } from 'lucide-react';
+import { Search, Loader2, CreditCard, Ticket, Printer, RefreshCw, SlidersHorizontal, X, ChevronDown, Camera, Keyboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -14,9 +14,10 @@ interface POSViewProps {
   onOpenCreateOrder: () => void;
   onOpenApplyVoucher: (tx: any) => void;
   onOpenPaymentProof: (tx: any) => void;
+  onOpenShortcuts: () => void;
 }
 
-export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentProof }: POSViewProps) {
+export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentProof, onOpenShortcuts }: POSViewProps) {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -164,6 +165,14 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
           <p className="text-sm text-muted-foreground">Process laundry transactions, apply loyalty vouchers, and print receipts.</p>
         </div>
         <div className="flex space-x-2">
+          {/* Keyboard Shortcuts Button */}
+          <button
+            onClick={onOpenShortcuts}
+            className="p-2 border border-border bg-background hover:bg-accent rounded-lg text-foreground transition-all cursor-pointer"
+            title="Keyboard Shortcuts"
+          >
+            <Keyboard className="h-4 w-4" />
+          </button>
           <button
             onClick={loadTransactions}
             className="p-2 border border-border bg-background hover:bg-accent rounded-lg text-foreground transition-all cursor-pointer"
