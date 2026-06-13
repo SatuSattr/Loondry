@@ -197,8 +197,13 @@ class VoucherController extends Controller
      */
     public function myVouchers(Request $request)
     {
+        $userId = $request->user()->id;
+        if ($request->user()->role === 'admin' && $request->filled('user_id')) {
+            $userId = $request->user_id;
+        }
+
         $vouchers = PointsRedemption::with('voucher')
-            ->where('user_id', $request->user()->id)
+            ->where('user_id', $userId)
             ->where('is_used', false)
             ->latest()
             ->get();

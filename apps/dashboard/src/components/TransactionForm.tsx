@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../lib/api';
-import { Search, Loader2, User, PlusCircle, ChevronDown } from 'lucide-react';
+import { Search, Loader2, User, PlusCircle, ChevronDown, Ticket } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -36,6 +36,10 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
   const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
   const [conditionFile, setConditionFile] = useState<File | null>(null);
   const [conditionPreview, setConditionPreview] = useState<string | null>(null);
+  const [paymentTiming, setPaymentTiming] = useState<'upfront' | 'pickup'>('upfront');
+  const [customerVouchers, setCustomerVouchers] = useState<any[]>([]);
+  const [selectedVoucher, setSelectedVoucher] = useState<any | null>(null);
+  const [loadingVouchers, setLoadingVouchers] = useState(false);
   
   // Submit state
   const [loading, setLoading] = useState(false);
@@ -60,6 +64,28 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
     }
     loadServices();
   }, []);
+
+  // Fetch customer vouchers when selectedCustomer changes
+  useEffect(() => {
+    if (!selectedCustomer) {
+      setCustomerVouchers([]);
+      setSelectedVoucher(null);
+      return;
+    }
+
+    async function loadCustomerVouchers() {
+      setLoadingVouchers(true);
+      try {
+        const res = await api.getCustomerVouchers(selectedCustomer.user?.id);
+        setCustomerVouchers(res.data || []);
+      } catch (err) {
+        console.error('Failed to load customer vouchers', err);
+      } finally {
+        setLoadingVouchers(false);
+      }
+    }
+    loadCustomerVouchers();
+  }, [selectedCustomer]);
 
   // Handle customer search query
   useEffect(() => {
@@ -100,8 +126,27 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
   const numericWeight = Number(weight) || 0;
   const subtotal = price * numericWeight;
 
+  // Calculate discount from selectedVoucher
+  let discount = 0;
+  if (selectedVoucher && selectedVoucher.voucher) {
+    const voucherInfo = selectedVoucher.voucher;
+    if (voucherInfo.discount_type === 'percentage') {
+      discount = subtotal * (Number(voucherInfo.discount_value) / 100);
+      if (voucherInfo.max_discount && discount > Number(voucherInfo.max_discount)) {
+        discount = Number(voucherInfo.max_discount);
+      }
+    } else {
+      discount = Number(voucherInfo.discount_value);
+    }
+  } else if (selectedVoucher) {
+    discount = Number(selectedVoucher.discount_value);
+  }
+  if (discount > subtotal) {
+    discount = subtotal;
+  }
+  const finalTotal = subtotal - discount;
+
   // Points configuration: 1 point per 1000 IDR
-  // points_earned = intdiv(subtotal, 1000) * 1
   const pointsEarned = Math.floor(subtotal / 1000);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -118,7 +163,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
       setError('Weight/Quantity must be greater than 0');
       return;
     }
-    if (paymentMethod === 'transfer' && !paymentProofFile) {
+    if (paymentTiming === 'upfront' && paymentMethod === 'transfer' && !paymentProofFile) {
       setError('Please upload the payment proof for transfer payments');
       return;
     }
@@ -131,14 +176,21 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
     formData.append('service_id', String(selectedService.id));
     formData.append('weight', String(numericWeight));
     formData.append('payment_method', paymentMethod);
-    if (paymentMethod === 'transfer' && paymentProofFile) {
+    formData.append('payment_status', paymentTiming === 'upfront' ? 'paid' : 'pending');
+    if (paymentTiming === 'upfront' && paymentMethod === 'transfer' && paymentProofFile) {
       formData.append('payment_proof', paymentProofFile);
     }
 
     try {
       const res = await api.createTransaction(formData);
-      if (conditionFile && res.data && res.data.id) {
-        await api.uploadConditionImages(res.data.id, conditionFile);
+      const transactionId = res.data?.id;
+
+      if (selectedVoucher && transactionId) {
+        await api.applyVoucher(transactionId, selectedVoucher.voucher_code);
+      }
+
+      if (conditionFile && transactionId) {
+        await api.uploadConditionImages(transactionId, conditionFile);
       }
       onSubmitSuccess();
     } catch (err: any) {
@@ -252,6 +304,56 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
         )}
       </div>
 
+      {/* Voucher Selection */}
+      {selectedCustomer && (
+        <div className="space-y-1.5 p-3.5 bg-muted/30 border border-border rounded-xl">
+          <div className="flex items-center space-x-1.5 text-xs font-semibold text-foreground">
+            <Ticket className="h-4 w-4 text-primary" />
+            <span>Pilih Voucher Pelanggan (Opsional)</span>
+          </div>
+          
+          {loadingVouchers ? (
+            <div className="flex items-center text-xs text-muted-foreground pt-1">
+              <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
+              <span>Memuat voucher aktif...</span>
+            </div>
+          ) : customerVouchers.length > 0 ? (
+            <div className="relative pt-1.5">
+              <select
+                value={selectedVoucher ? selectedVoucher.id : ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    setSelectedVoucher(null);
+                  } else {
+                    const v = customerVouchers.find((cv) => cv.id === Number(val));
+                    setSelectedVoucher(v || null);
+                  }
+                }}
+                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground"
+              >
+                <option value="">-- Tanpa Voucher --</option>
+                {customerVouchers.map((cv) => {
+                  const v = cv.voucher;
+                  const desc = v
+                    ? `${v.voucher_name} (Disc. ${v.discount_type === 'percentage' ? `${v.discount_value}%` : `Rp ${Number(v.discount_value).toLocaleString()}`})`
+                    : `Discount Rp ${Number(cv.discount_value).toLocaleString()}`;
+                  return (
+                    <option key={cv.id} value={cv.id}>
+                      {cv.voucher_code} - {desc}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground pt-1 pl-5">
+              Pelanggan ini tidak memiliki voucher loyalitas yang belum terpakai.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Service Selection */}
       <div className="space-y-1">
         <label className="text-sm font-medium text-foreground">Service *</label>
@@ -351,7 +453,40 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
           </label>
         </div>
 
-        {paymentMethod === 'transfer' && (
+        {/* Payment Timing */}
+        <div className="space-y-1.5 pt-3">
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Waktu Pembayaran *</label>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setPaymentTiming('upfront')}
+              className={`py-2 px-3 border rounded-lg text-xs font-medium cursor-pointer transition-all ${
+                paymentTiming === 'upfront'
+                  ? 'border-primary bg-primary/5 text-primary font-semibold'
+                  : 'border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground'
+              }`}
+            >
+              Bayar Sekarang (Upfront)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPaymentTiming('pickup');
+                setPaymentProofFile(null);
+                setPaymentProofPreview(null);
+              }}
+              className={`py-2 px-3 border rounded-lg text-xs font-medium cursor-pointer transition-all ${
+                paymentTiming === 'pickup'
+                  ? 'border-primary bg-primary/5 text-primary font-semibold'
+                  : 'border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground'
+              }`}
+            >
+              Bayar Nanti (Saat Diambil)
+            </button>
+          </div>
+        </div>
+
+        {paymentMethod === 'transfer' && paymentTiming === 'upfront' && (
           <div className="space-y-1.5 pt-2 animate-in fade-in-50 duration-200">
             <label className="text-sm font-semibold text-foreground">Payment Proof Image *</label>
             {paymentProofPreview ? (
@@ -450,13 +585,23 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
           <span className="text-muted-foreground">Quantity</span>
           <span className="font-medium">{numericWeight} {unit}</span>
         </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Subtotal</span>
+          <span className="font-medium">Rp {subtotal.toLocaleString()}</span>
+        </div>
+        {discount > 0 && (
+          <div className="flex justify-between text-emerald-500 font-semibold">
+            <span>Discount (Voucher)</span>
+            <span>-Rp {discount.toLocaleString()}</span>
+          </div>
+        )}
         <div className="flex justify-between border-t border-border pt-2">
           <span className="text-muted-foreground">Points to Earn</span>
           <span className="font-semibold text-emerald-500">+{pointsEarned} pts</span>
         </div>
         <div className="flex justify-between border-t border-border pt-2 text-base font-bold text-foreground">
           <span>Total Price</span>
-          <span>Rp {subtotal.toLocaleString()}</span>
+          <span>Rp {finalTotal.toLocaleString()}</span>
         </div>
       </div>
 

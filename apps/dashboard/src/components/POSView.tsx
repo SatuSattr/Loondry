@@ -63,6 +63,13 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
   }, []);
 
   const handleStatusChange = async (id: number, newStatus: string) => {
+    if (newStatus === 'diambil') {
+      const confirmCompleted = window.confirm(
+        "Apakah Anda yakin ingin menyelesaikan transaksi ini? Setelah status diubah menjadi 'diambil', status transaksi tidak dapat diubah lagi."
+      );
+      if (!confirmCompleted) return;
+    }
+
     setUpdatingStatusId(id);
     try {
       await api.updateTransactionStatus(id, newStatus);
@@ -332,42 +339,48 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
 
                         {/* Order Status */}
                         <td className="p-4">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              render={
-                                <Button
-                                  disabled={updatingStatusId === tx.id}
-                                  variant="outline"
-                                  size="sm"
-                                  className={`h-7 px-2 text-xs font-semibold border-none shadow-none focus-visible:ring-0 focus:ring-0 cursor-pointer bg-transparent capitalize select-none ${
-                                    tx.status === 'siap diambil' || tx.status === 'diambil'
-                                      ? 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
-                                      : tx.status === 'antrian'
-                                      ? 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20'
-                                      : 'bg-blue-500/10 text-blue-500 hover:bg-blue-500/20'
-                                  }`}
-                                >
-                                  <span>{tx.status}</span>
-                                  <ChevronDown className="h-3 w-3 ml-1 opacity-70" />
-                                </Button>
-                              }
-                            />
-                            <DropdownMenuContent className="w-48 bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
-                              {Object.entries(statusLabels)
-                                .filter(([key]) => key !== 'all')
-                                .map(([key, val]) => (
-                                  <DropdownMenuItem
-                                    key={key}
-                                    onClick={() => handleStatusChange(tx.id, key)}
-                                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
-                                      tx.status === key ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
+                          {tx.status === 'diambil' ? (
+                            <span className="inline-flex items-center h-7 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-500/10 text-emerald-500 capitalize select-none cursor-default">
+                              {tx.status}
+                            </span>
+                          ) : (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger
+                                render={
+                                  <Button
+                                    disabled={updatingStatusId === tx.id}
+                                    variant="outline"
+                                    size="sm"
+                                    className={`h-7 px-2 text-xs font-semibold border-none shadow-none focus-visible:ring-0 focus:ring-0 cursor-pointer bg-transparent capitalize select-none ${
+                                      tx.status === 'siap diambil'
+                                        ? 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
+                                        : tx.status === 'antrian'
+                                        ? 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20'
+                                        : 'bg-blue-500/10 text-blue-500 hover:bg-blue-500/20'
                                     }`}
                                   >
-                                    {val}
-                                  </DropdownMenuItem>
-                                ))}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                                    <span>{tx.status}</span>
+                                    <ChevronDown className="h-3 w-3 ml-1 opacity-70" />
+                                  </Button>
+                                }
+                              />
+                              <DropdownMenuContent className="w-48 bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
+                                {Object.entries(statusLabels)
+                                  .filter(([key]) => key !== 'all')
+                                  .map(([key, val]) => (
+                                    <DropdownMenuItem
+                                      key={key}
+                                      onClick={() => handleStatusChange(tx.id, key)}
+                                      className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
+                                        tx.status === key ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
+                                      }`}
+                                    >
+                                      {val}
+                                    </DropdownMenuItem>
+                                  ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
                         </td>
 
                         {/* Payment status */}
@@ -385,7 +398,7 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
                         <td className="p-4">
                           <div className="flex items-center justify-center space-x-1.5">
                             {/* Pay (Upload Proof) */}
-                            {tx.payment_status !== 'paid' ? (
+                            {tx.payment_status !== 'paid' && tx.status !== 'diambil' ? (
                               <button
                                 onClick={() => onOpenPaymentProof(tx)}
                                 className="p-1.5 rounded-md border border-border bg-background hover:bg-accent text-foreground transition-all cursor-pointer"
@@ -396,7 +409,7 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
                             ) : null}
 
                             {/* Apply Voucher */}
-                            {tx.payment_status !== 'paid' && !tx.voucher_code ? (
+                            {tx.payment_status !== 'paid' && !tx.voucher_code && tx.status !== 'diambil' ? (
                               <button
                                 onClick={() => onOpenApplyVoucher(tx)}
                                 className="p-1.5 rounded-md border border-border bg-background hover:bg-accent text-foreground transition-all cursor-pointer"

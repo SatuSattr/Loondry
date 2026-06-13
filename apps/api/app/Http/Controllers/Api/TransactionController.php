@@ -44,17 +44,17 @@ class TransactionController extends Controller
         $invoice_code = 'LND-' . str_pad($id, 3, '0', STR_PAD_LEFT);
 
         $transaction = DB::transaction(function () use ($request, $invoice_code, $raw_total, $points_earned) {
-            $paymentStatus = 'pending';
+            $paymentStatus = $request->input('payment_status', 'pending');
             $paidAt = null;
             $proofPath = null;
 
-            if ($request->payment_method === 'cash') {
-                $paymentStatus = 'paid';
+            if ($paymentStatus === 'paid') {
                 $paidAt = now();
-            } elseif ($request->payment_method === 'transfer' && $request->hasFile('payment_proof')) {
-                $proofPath = $request->file('payment_proof')->store('payment_proofs', 'public');
-                $paymentStatus = 'paid';
-                $paidAt = now();
+                if ($request->payment_method === 'transfer' && $request->hasFile('payment_proof')) {
+                    $proofPath = $request->file('payment_proof')->store('payment_proofs', 'public');
+                }
+            } else {
+                $paymentStatus = 'pending';
             }
 
             $transaction = Transaction::create([

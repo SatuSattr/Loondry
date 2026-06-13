@@ -25,6 +25,7 @@ test('admin can create transaction', function () {
         'service_id' => $this->service->id,
         'weight' => 2,
         'payment_method' => 'cash',
+        'payment_status' => 'paid',
     ]);
 
     $response->assertStatus(201)

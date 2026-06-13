@@ -26,6 +26,7 @@ class TransactionRequest extends FormRequest
             'service_id' => ['required', 'exists:services,id'],
             'weight' => ['required', 'numeric', 'min:0.1'],
             'payment_method' => ['required', 'in:cash,transfer'],
+            'payment_status' => ['required', 'in:pending,paid'],
             'payment_proof' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
         ];
     }
