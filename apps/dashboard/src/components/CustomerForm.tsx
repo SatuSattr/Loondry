@@ -190,38 +190,40 @@ export function CustomerForm({ customer, onSubmitSuccess, onCancel }: CustomerFo
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
           <label className="text-sm font-medium text-foreground">Gender</label>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
+          <div>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
+                  >
+                    <span>{gender === 'L' ? 'Male (L)' : 'Female (P)'}</span>
+                    <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent className="w-[150px] bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
+                <DropdownMenuItem
+                  onClick={() => setGender('L')}
+                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
+                    gender === 'L' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
+                  }`}
                 >
-                  <span>{gender === 'L' ? 'Male (L)' : 'Female (P)'}</span>
-                  <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
-                </Button>
-              }
-            />
-            <DropdownMenuContent className="w-[150px] bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
-              <DropdownMenuItem
-                onClick={() => setGender('L')}
-                className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
-                  gender === 'L' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
-                }`}
-              >
-                Male (L)
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setGender('P')}
-                className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
-                  gender === 'P' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
-                }`}
-              >
-                Female (P)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  Male (L)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setGender('P')}
+                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
+                    gender === 'P' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
+                  }`}
+                >
+                  Female (P)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         <div className="space-y-1">

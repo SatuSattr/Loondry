@@ -324,7 +324,6 @@ export default function App() {
               setActiveItem(tx);
               setSlideOverType('payment-proof');
             }}
-            onOpenShortcuts={() => setSlideOverType('shortcuts-info')}
           />
         );
       case 'customers':

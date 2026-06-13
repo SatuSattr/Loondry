@@ -102,74 +102,78 @@ export function ServiceForm({ service, onSubmitSuccess, onCancel }: ServiceFormP
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
           <label className="text-sm font-medium text-foreground">Unit *</label>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
+          <div>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
+                  >
+                    <span>{unit}</span>
+                    <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent className="w-[150px] bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
+                <DropdownMenuItem
+                  onClick={() => setUnit('Kg')}
+                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
+                    unit === 'Kg' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
+                  }`}
                 >
-                  <span>{unit}</span>
-                  <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
-                </Button>
-              }
-            />
-            <DropdownMenuContent className="w-[150px] bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
-              <DropdownMenuItem
-                onClick={() => setUnit('Kg')}
-                className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
-                  unit === 'Kg' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
-                }`}
-              >
-                Kg
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setUnit('Pcs')}
-                className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
-                  unit === 'Pcs' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
-                }`}
-              >
-                Pcs
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  Kg
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setUnit('Pcs')}
+                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
+                    unit === 'Pcs' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
+                  }`}
+                >
+                  Pcs
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         <div className="space-y-1">
           <label className="text-sm font-medium text-foreground">Status *</label>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
+          <div>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
+                  >
+                    <span className="capitalize">{status}</span>
+                    <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent className="w-[150px] bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
+                <DropdownMenuItem
+                  onClick={() => setStatus('active')}
+                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
+                    status === 'active' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
+                  }`}
                 >
-                  <span className="capitalize">{status}</span>
-                  <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
-                </Button>
-              }
-            />
-            <DropdownMenuContent className="w-[150px] bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
-              <DropdownMenuItem
-                onClick={() => setStatus('active')}
-                className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
-                  status === 'active' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
-                }`}
-              >
-                Active
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setStatus('inactive')}
-                className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
-                  status === 'inactive' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
-                }`}
-              >
-                Inactive
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  Active
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setStatus('inactive')}
+                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
+                    status === 'inactive' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
+                  }`}
+                >
+                  Inactive
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 

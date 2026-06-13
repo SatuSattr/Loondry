@@ -319,37 +319,39 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
             <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading services...
           </div>
         ) : (
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
-                >
-                  <span>
-                    {selectedService
-                      ? `${selectedService.service_name} (Rp ${selectedService.price.toLocaleString()}/${selectedService.unit})`
-                      : 'Select a service...'}
-                  </span>
-                  <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
-                </Button>
-              }
-            />
-            <DropdownMenuContent className="w-80 max-h-60 overflow-y-auto bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
-              {services.map((s) => (
-                <DropdownMenuItem
-                  key={s.id}
-                  onClick={() => setSelectedService(s)}
-                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
-                    selectedService?.id === s.id ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
-                  }`}
-                >
-                  {s.service_name} (Rp {s.price.toLocaleString()}/{s.unit})
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
+                  >
+                    <span>
+                      {selectedService
+                        ? `${selectedService.service_name} (Rp ${selectedService.price.toLocaleString()}/${selectedService.unit})`
+                        : 'Select a service...'}
+                    </span>
+                    <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent className="w-80 max-h-60 overflow-y-auto bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
+                {services.map((s) => (
+                  <DropdownMenuItem
+                    key={s.id}
+                    onClick={() => setSelectedService(s)}
+                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
+                      selectedService?.id === s.id ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
+                    }`}
+                  >
+                    {s.service_name} (Rp {s.price.toLocaleString()}/{s.unit})
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         )}
       </div>
 

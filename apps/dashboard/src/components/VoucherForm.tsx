@@ -153,38 +153,40 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
           <label className="text-sm font-medium text-foreground">Discount Type *</label>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
+          <div>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
+                  >
+                    <span>{discountType === 'percentage' ? 'Percentage (%)' : 'Flat Amount (Rp)'}</span>
+                    <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent className="w-[150px] bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
+                <DropdownMenuItem
+                  onClick={() => setDiscountType('percentage')}
+                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
+                    discountType === 'percentage' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
+                  }`}
                 >
-                  <span>{discountType === 'percentage' ? 'Percentage (%)' : 'Flat Amount (Rp)'}</span>
-                  <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
-                </Button>
-              }
-            />
-            <DropdownMenuContent className="w-[150px] bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
-              <DropdownMenuItem
-                onClick={() => setDiscountType('percentage')}
-                className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
-                  discountType === 'percentage' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
-                }`}
-              >
-                Percentage (%)
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setDiscountType('flat')}
-                className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
-                  discountType === 'flat' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
-                }`}
-              >
-                Flat Amount (Rp)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  Percentage (%)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setDiscountType('flat')}
+                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
+                    discountType === 'flat' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
+                  }`}
+                >
+                  Flat Amount (Rp)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         <div className="space-y-1">
@@ -246,38 +248,40 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
 
         <div className="space-y-1">
           <label className="text-sm font-medium text-foreground">Status *</label>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
+          <div>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
+                  >
+                    <span className="capitalize">{status}</span>
+                    <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent className="w-[150px] bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
+                <DropdownMenuItem
+                  onClick={() => setStatus('active')}
+                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
+                    status === 'active' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
+                  }`}
                 >
-                  <span className="capitalize">{status}</span>
-                  <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
-                </Button>
-              }
-            />
-            <DropdownMenuContent className="w-[150px] bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
-              <DropdownMenuItem
-                onClick={() => setStatus('active')}
-                className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
-                  status === 'active' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
-                }`}
-              >
-                Active
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setStatus('inactive')}
-                className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
-                  status === 'inactive' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
-                }`}
-              >
-                Inactive
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  Active
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setStatus('inactive')}
+                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
+                    status === 'inactive' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
+                  }`}
+                >
+                  Inactive
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 
