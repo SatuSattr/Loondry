@@ -388,7 +388,7 @@ test('refined voucher system features: redemption, expiration, security and usag
     ]);
     // Mismatch user ID should fail with 422
     $creationResponse1->assertStatus(422);
-    expect($creationResponse1->json('message'))->toContain('milik customer lain');
+    expect($creationResponse1->json('message'))->toContain('another customer');
 
     // 4. Expiration check
     $redemption->update(['expires_at' => now()->subDay()]); // Make it expired
@@ -401,7 +401,7 @@ test('refined voucher system features: redemption, expiration, security and usag
         'voucher_code' => $voucherCode,
     ]);
     $creationResponse2->assertStatus(422);
-    expect($creationResponse2->json('message'))->toContain('kedaluwarsa');
+    expect($creationResponse2->json('message'))->toContain('expired');
 
     // Reset expiry for successful use
     $redemption->update(['expires_at' => now()->addDays(3)]);
@@ -478,5 +478,5 @@ test('admin cannot apply voucher code on creation when payment is pending', func
     ]);
 
     $response->assertStatus(422);
-    expect($response->json('message'))->toContain('pelunasan pembayaran');
+    expect($response->json('message'))->toContain('payment completion');
 });

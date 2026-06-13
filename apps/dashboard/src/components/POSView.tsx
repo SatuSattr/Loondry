@@ -53,9 +53,9 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
       // reload transactions so the new image path is loaded
       const res = await api.getTransactions();
       setTransactions(res.data || []);
-      alert('Foto kondisi baju berhasil diunggah!');
+      alert('Clothes condition photo uploaded successfully!');
     } catch (err: any) {
-      alert(err.message || 'Gagal mengunggah foto kondisi baju');
+      alert(err.message || 'Failed to upload clothes condition photo');
     } finally {
       setUploadingConditionId(null);
     }
@@ -338,7 +338,7 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
                               className="mt-1.5 inline-flex items-center space-x-1 text-xs text-primary hover:text-primary/80 hover:underline cursor-pointer bg-primary/5 dark:bg-primary/10 px-2 py-0.5 rounded-md transition-colors border-none"
                             >
                               <Camera className="h-3.5 w-3.5 mr-1" />
-                              <span>Lihat Kondisi Baju</span>
+                              <span>View Clothes Condition</span>
                             </button>
                           )}
                         </td>
@@ -461,7 +461,7 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
                                 document.getElementById('condition-image-upload-input')?.click();
                               }}
                               className="p-1.5 rounded-md border border-border bg-background hover:bg-accent text-foreground transition-all cursor-pointer disabled:opacity-50"
-                              title="Upload Foto Kondisi Baju"
+                              title="Upload Clothes Condition Photo"
                             >
                               {uploadingConditionId === tx.id ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -532,10 +532,10 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
           onOpenChange={(open) => {
             if (!open) setConfirmingTxId(null);
           }}
-          title="Selesaikan Transaksi?"
-          description="Apakah Anda yakin ingin menyelesaikan transaksi ini? Setelah status diubah menjadi 'diambil' (Completed), status transaksi tidak dapat diubah lagi."
-          confirmText="Ya, Selesaikan"
-          cancelText="Batal"
+          title="Complete Transaction?"
+          description="Are you sure you want to complete this transaction? Once the status is changed to 'diambil' (Completed), the transaction status cannot be changed again."
+          confirmText="Yes, Complete"
+          cancelText="Cancel"
           showCheckbox={false}
           onConfirm={() => {
             executeStatusChange(confirmingTxId, 'diambil');

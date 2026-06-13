@@ -130,11 +130,11 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
 
   const handleApplyVoucher = async () => {
     if (!selectedCustomer) {
-      setVoucherError('Silakan pilih customer terlebih dahulu.');
+      setVoucherError('Please select a customer first.');
       return;
     }
     if (!voucherCode.trim()) {
-      setVoucherError('Masukkan kode voucher.');
+      setVoucherError('Please enter a voucher code.');
       return;
     }
     setCheckingVoucher(true);
@@ -149,12 +149,12 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
           discount: Number(res.discount),
           name: res.name
         });
-        setVoucherSuccessMsg(`Voucher berhasil digunakan! Diskon: Rp ${Number(res.discount).toLocaleString()}`);
+        setVoucherSuccessMsg(`Voucher applied successfully! Discount: Rp ${Number(res.discount).toLocaleString()}`);
       } else {
-        setVoucherError(res.message || 'Voucher tidak valid.');
+        setVoucherError(res.message || 'Invalid voucher.');
       }
     } catch (err: any) {
-      setVoucherError(err.message || 'Voucher tidak valid atau sudah kedaluwarsa.');
+      setVoucherError(err.message || 'Invalid or expired voucher.');
     } finally {
       setCheckingVoucher(false);
     }
@@ -372,7 +372,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
 
       {/* 4. Payment Period (Waktu Pembayaran) */}
       <div className="space-y-1.5">
-        <label className="text-sm font-medium text-foreground">Waktu Pembayaran *</label>
+        <label className="text-sm font-medium text-foreground">Payment Timing *</label>
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
@@ -383,7 +383,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
                 : 'border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground'
             }`}
           >
-            Bayar Sekarang (Upfront)
+            Pay Now (Upfront)
           </button>
           <button
             type="button"
@@ -398,7 +398,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
                 : 'border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground'
             }`}
           >
-            Bayar Nanti (Saat Diambil)
+            Pay Later (Upon Pickup)
           </button>
         </div>
       </div>
@@ -510,12 +510,12 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
         <div className="space-y-2 p-3.5 bg-muted/30 border border-border rounded-xl">
           <div className="flex items-center space-x-1.5 text-xs font-semibold text-foreground">
             <Ticket className="h-4 w-4 text-primary" />
-            <span>Masukkan Kode Voucher (Opsional)</span>
+            <span>Enter Voucher Code (Optional)</span>
           </div>
           <div className="flex gap-2 pt-1.5">
             <input
               type="text"
-              placeholder="Masukkan kode voucher customer..."
+              placeholder="Enter customer's voucher code..."
               value={voucherCode}
               onChange={(e) => setVoucherCode(e.target.value)}
               className="flex-1 bg-background border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground uppercase"
@@ -525,7 +525,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
               onClick={handleApplyVoucher}
               disabled={checkingVoucher || !voucherCode.trim()}
               className="bg-primary text-primary-foreground hover:bg-primary/90 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center min-w-10"
-              title="Terapkan Voucher"
+              title="Apply Voucher"
             >
               {checkingVoucher ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

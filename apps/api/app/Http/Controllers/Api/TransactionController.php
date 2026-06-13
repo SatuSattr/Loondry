@@ -49,7 +49,7 @@ class TransactionController extends Controller
         if ($request->filled('voucher_code')) {
             if ($paymentStatus === 'pending') {
                 return response()->json([
-                    'message' => 'Voucher tidak dapat digunakan pada pembuatan transaksi dengan metode pembayaran tunda (Bayar Nanti). Silakan gunakan voucher saat melakukan pelunasan pembayaran.'
+                    'message' => 'Vouchers cannot be applied when creating a transaction with deferred payment (Pay Later). Please use the voucher during payment completion.'
                 ], 422);
             }
 
@@ -166,13 +166,13 @@ class TransactionController extends Controller
 
         if ($transaction->status === 'diambil') {
             return response()->json([
-                'message' => 'Transaksi yang sudah selesai (diambil) tidak dapat diubah statusnya lagi.',
+                'message' => 'Completed transactions (diambil) cannot have their status updated again.',
             ], 422);
         }
 
         if ($request->status === 'diambil' && $transaction->payment_status === 'pending') {
             return response()->json([
-                'message' => 'Transaksi tidak dapat diselesaikan karena pembayaran masih tertunda (pending). Silakan lakukan pelunasan terlebih dahulu.',
+                'message' => 'The transaction cannot be completed because payment is still pending. Please process the payment first.',
             ], 422);
         }
 
@@ -233,7 +233,7 @@ class TransactionController extends Controller
         ]);
 
         if ($transaction->voucher_code && $request->filled('voucher_code')) {
-            return response()->json(['message' => 'Transaksi ini sudah menggunakan voucher.'], 422);
+            return response()->json(['message' => 'This transaction has already applied a voucher.'], 422);
         }
 
         $discount = $transaction->discount ?: 0;

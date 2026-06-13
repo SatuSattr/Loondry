@@ -40,7 +40,7 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
 
   const handleApplyVoucher = async () => {
     if (!voucherCode.trim()) {
-      setVoucherError('Masukkan kode voucher.');
+      setVoucherError('Please enter a voucher code.');
       return;
     }
     setCheckingVoucher(true);
@@ -59,12 +59,12 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
           discount: Number(res.discount),
           name: res.name
         });
-        setVoucherSuccessMsg(`Voucher berhasil digunakan! Diskon: Rp ${Number(res.discount).toLocaleString()}`);
+        setVoucherSuccessMsg(`Voucher applied successfully! Discount: Rp ${Number(res.discount).toLocaleString()}`);
       } else {
-        setVoucherError(res.message || 'Voucher tidak valid.');
+        setVoucherError(res.message || 'Invalid voucher.');
       }
     } catch (err: any) {
-      setVoucherError(err.message || 'Voucher tidak valid atau sudah kedaluwarsa.');
+      setVoucherError(err.message || 'Invalid or expired voucher.');
     } finally {
       setCheckingVoucher(false);
     }
@@ -123,7 +123,7 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
         </div>
         {currentDiscount > 0 && (
           <div className="flex justify-between text-emerald-500 font-semibold">
-            <span>Diskon Voucher</span>
+            <span>Voucher Discount</span>
             <span>-Rp {currentDiscount.toLocaleString()}</span>
           </div>
         )}
@@ -196,12 +196,12 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
         <div className="space-y-2 p-3 bg-muted/40 border border-border rounded-lg">
           <div className="flex items-center space-x-1.5 text-xs font-semibold text-foreground">
             <Ticket className="h-3.5 w-3.5 text-primary" />
-            <span>Gunakan Voucher Belanja (Opsional)</span>
+            <span>Use Shopping Voucher (Optional)</span>
           </div>
           <div className="flex gap-2 pt-1">
             <input
               type="text"
-              placeholder="Masukkan kode voucher customer..."
+              placeholder="Enter customer's voucher code..."
               value={voucherCode}
               onChange={(e) => setVoucherCode(e.target.value)}
               className="flex-1 bg-background border border-border rounded-lg px-2.5 py-1.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground uppercase"
@@ -211,7 +211,7 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
               onClick={handleApplyVoucher}
               disabled={checkingVoucher || !voucherCode.trim()}
               className="bg-primary text-primary-foreground hover:bg-primary/95 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center min-w-8"
-              title="Terapkan Voucher"
+              title="Apply Voucher"
             >
               {checkingVoucher ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -232,9 +232,9 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
       {/* Upload Box */}
       {currentPaymentMethod === 'cash' ? (
         <div className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-lg p-4 text-xs space-y-2">
-          <p className="font-semibold text-sm">Pembayaran Cash</p>
+          <p className="font-semibold text-sm">Cash Payment</p>
           <p className="text-muted-foreground text-[11px] leading-relaxed">
-            Metode pembayaran transaksi ini adalah <strong>Cash</strong>. Anda tidak perlu mengunggah foto bukti pembayaran.
+            The payment method for this transaction is <strong>Cash</strong>. You do not need to upload a payment proof image.
           </p>
         </div>
       ) : (

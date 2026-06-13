@@ -46,15 +46,15 @@ class PointsRedemption extends Model
             ->first();
 
         if (!$redemption) {
-            throw new \Exception('Voucher tidak ditemukan atau sudah digunakan.');
+            throw new \Exception('Voucher not found or already used.');
         }
 
         if ($redemption->user_id !== $customer->user_id) {
-            throw new \Exception('Voucher ini milik customer lain.');
+            throw new \Exception('This voucher belongs to another customer.');
         }
 
         if ($redemption->expires_at && now()->gt($redemption->expires_at)) {
-            throw new \Exception('Voucher sudah kedaluwarsa (masa aktif 3 hari habis).');
+            throw new \Exception('Voucher has expired (3-day validity period has passed).');
         }
 
         $discount = 0;
@@ -63,14 +63,14 @@ class PointsRedemption extends Model
             $today = now()->startOfDay();
 
             if ($voucher->start_date && $today->lt($voucher->start_date)) {
-                throw new \Exception('Voucher belum dapat digunakan.');
+                throw new \Exception('Voucher cannot be used yet.');
             }
             if ($voucher->end_date && $today->gt($voucher->end_date)) {
-                throw new \Exception('Voucher sudah kedaluwarsa.');
+                throw new \Exception('Voucher has expired.');
             }
 
             if ($voucher->min_transaction && $totalPrice < $voucher->min_transaction) {
-                throw new \Exception('Minimal transaksi untuk voucher ini adalah Rp ' . number_format($voucher->min_transaction, 0, ',', '.'));
+                throw new \Exception('The minimum transaction amount for this voucher is Rp ' . number_format($voucher->min_transaction, 0, ',', '.'));
             }
 
             if ($voucher->discount_type === 'percentage') {
