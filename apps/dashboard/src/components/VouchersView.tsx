@@ -11,6 +11,7 @@ import {
   Calendar,
   Layers,
   Activity,
+  User,
 } from 'lucide-react';
 import ErrorDialog from '@/components/shadcn-studio/blocks/dashboard-dialog-22/dialog-error';
 
@@ -296,6 +297,10 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
                           <Activity className="h-3.5 w-3.5 text-muted-foreground" />
                           <span className="font-semibold text-emerald-500">Exchange Cost: {v.points_cost} pts</span>
                         </div>
+                        <div className="flex items-center space-x-2">
+                          <User className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span>Limit/Cust: {v.max_uses_per_user ? `${v.max_uses_per_user} time(s)` : 'Unlimited'}</span>
+                        </div>
                       </div>
                     </div>
 
@@ -359,6 +364,7 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
                     <th className="p-4">Discount</th>
                     <th className="p-4">Min. Spend / Cap</th>
                     <th className="p-4">Points Cost</th>
+                    <th className="p-4">Limit/Cust</th>
                     <th className="p-4">Validity</th>
                     <th className="p-4">Status</th>
                     <th className="p-4 text-center">Actions</th>
@@ -415,6 +421,9 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
                           </td>
                           <td className="p-4 font-semibold text-emerald-500 text-xs">
                             {v.points_cost} pts
+                          </td>
+                          <td className="p-4 text-xs text-foreground">
+                            {v.max_uses_per_user ? `${v.max_uses_per_user}x` : 'Unlimited'}
                           </td>
                           <td className="p-4 text-xs text-muted-foreground">
                             {dateRangeStr}

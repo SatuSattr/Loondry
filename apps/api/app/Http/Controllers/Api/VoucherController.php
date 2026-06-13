@@ -40,6 +40,7 @@ class VoucherController extends Controller
             'max_discount' => ['nullable', 'numeric', 'min:0'],
             'min_transaction' => ['nullable', 'numeric', 'min:0'],
             'points_cost' => ['required', 'integer', 'min:0'],
+            'max_uses_per_user' => ['nullable', 'integer', 'min:1'],
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'status' => ['nullable', 'string', 'in:active,inactive'],
@@ -75,6 +76,7 @@ class VoucherController extends Controller
             'max_discount' => ['nullable', 'numeric', 'min:0'],
             'min_transaction' => ['nullable', 'numeric', 'min:0'],
             'points_cost' => ['required', 'integer', 'min:0'],
+            'max_uses_per_user' => ['nullable', 'integer', 'min:1'],
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'status' => ['nullable', 'string', 'in:active,inactive'],
@@ -146,6 +148,16 @@ class VoucherController extends Controller
         }
         if ($voucher->end_date && $today->gt($voucher->end_date)) {
             return response()->json(['message' => 'Voucher period has expired'], 400);
+        }
+
+        // Validate maximum usage limit per user
+        if ($voucher->max_uses_per_user && $voucher->max_uses_per_user > 0) {
+            $userRedemptionsCount = PointsRedemption::where('user_id', $targetUser->id)
+                ->where('voucher_id', $voucher->id)
+                ->count();
+            if ($userRedemptionsCount >= $voucher->max_uses_per_user) {
+                return response()->json(['message' => 'You have reached the maximum redemption limit for this voucher.'], 400);
+            }
         }
 
         $voucherCode = strtoupper($voucher->code . '-' . Str::random(6));

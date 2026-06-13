@@ -24,6 +24,7 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
   const [maxDiscount, setMaxDiscount] = useState('');
   const [minTransaction, setMinTransaction] = useState('');
   const [pointsCost, setPointsCost] = useState('');
+  const [maxUsesPerUser, setMaxUsesPerUser] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [status, setStatus] = useState('active');
@@ -41,6 +42,7 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
       setMaxDiscount(voucher.max_discount ? String(voucher.max_discount) : '');
       setMinTransaction(voucher.min_transaction ? String(voucher.min_transaction) : '');
       setPointsCost(voucher.points_cost ? String(voucher.points_cost) : '');
+      setMaxUsesPerUser(voucher.max_uses_per_user ? String(voucher.max_uses_per_user) : '');
       setStartDate(voucher.start_date ? voucher.start_date.substring(0, 10) : '');
       setEndDate(voucher.end_date ? voucher.end_date.substring(0, 10) : '');
       setStatus(voucher.status || 'active');
@@ -54,6 +56,7 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
       setMaxDiscount('');
       setMinTransaction('');
       setPointsCost('');
+      setMaxUsesPerUser('');
       setStartDate('');
       setEndDate('');
       setStatus('active');
@@ -80,6 +83,7 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
       max_discount: maxDiscount ? Number(maxDiscount) : null,
       min_transaction: minTransaction ? Number(minTransaction) : null,
       points_cost: Number(pointsCost),
+      max_uses_per_user: maxUsesPerUser ? Number(maxUsesPerUser) : null,
       start_date: startDate || null,
       end_date: endDate || null,
       status: status,
@@ -273,6 +277,22 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+      </div>
+
+      {/* Max Redemptions per Customer */}
+      <div className="space-y-1">
+        <label className="text-sm font-medium text-foreground">Max Redemptions per Customer</label>
+        <input
+          type="number"
+          min="1"
+          value={maxUsesPerUser}
+          onChange={(e) => setMaxUsesPerUser(e.target.value)}
+          placeholder="Unlimited (e.g. 5)"
+          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground"
+        />
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Limit how many times a single customer can redeem this voucher. Leave empty for unlimited.
+        </p>
       </div>
 
       {/* Validity Dates */}

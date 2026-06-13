@@ -153,7 +153,9 @@ export function RedeemVoucherForm({ customer, onSubmitSuccess, onCancel }: Redee
                     <div className="space-y-1 text-left">
                       <span className="font-bold text-foreground text-sm block tracking-tight leading-tight">{v.name}</span>
                       <span className="text-xs text-primary font-bold block">{discountStr}</span>
-                      <span className="text-[10px] text-muted-foreground block">{formattedMinTx}</span>
+                      <span className="text-[10px] text-muted-foreground block">
+                        {formattedMinTx} • Limit/Cust: {v.max_uses_per_user ? `${v.max_uses_per_user}x` : 'Unlimited'}
+                      </span>
                       {v.description && (
                         <p className="text-[11px] text-muted-foreground/80 mt-1 line-clamp-2">{v.description}</p>
                       )}

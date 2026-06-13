@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'max_discount',
     'min_transaction',
     'points_cost',
+    'max_uses_per_user',
     'start_date',
     'end_date',
     'status'
@@ -31,6 +32,7 @@ class Voucher extends Model
             'max_discount' => 'float',
             'min_transaction' => 'float',
             'points_cost' => 'integer',
+            'max_uses_per_user' => 'integer',
             'start_date' => 'date',
             'end_date' => 'date',
         ];
