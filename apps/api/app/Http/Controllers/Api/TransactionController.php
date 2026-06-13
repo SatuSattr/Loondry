@@ -48,7 +48,10 @@ class TransactionController extends Controller
             $paidAt = null;
             $proofPath = null;
 
-            if ($request->payment_method === 'transfer' && $request->hasFile('payment_proof')) {
+            if ($request->payment_method === 'cash') {
+                $paymentStatus = 'paid';
+                $paidAt = now();
+            } elseif ($request->payment_method === 'transfer' && $request->hasFile('payment_proof')) {
                 $proofPath = $request->file('payment_proof')->store('payment_proofs', 'public');
                 $paymentStatus = 'paid';
                 $paidAt = now();
@@ -164,21 +167,28 @@ class TransactionController extends Controller
     {
         $this->authorizeTransaction($transaction);
         $request->validate([
-            'payment_proof' => ['required', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
+            'payment_proof' => $transaction->payment_method === 'cash'
+                ? ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048']
+                : ['required', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
         ]);
 
-        if ($transaction->payment_proof) {
-            Storage::disk('public')->delete($transaction->payment_proof);
+        $path = null;
+        if ($request->hasFile('payment_proof')) {
+            if ($transaction->payment_proof) {
+                Storage::disk('public')->delete($transaction->payment_proof);
+            }
+            $path = $request->file('payment_proof')->store('payment_proofs', 'public');
         }
 
-        $path = $request->file('payment_proof')->store('payment_proofs', 'public');
-
         DB::transaction(function () use ($path, $transaction) {
-            $transaction->update([
-                'payment_proof' => $path,
+            $updateData = [
                 'payment_status' => 'paid',
                 'paid_at' => now(),
-            ]);
+            ];
+            if ($path !== null) {
+                $updateData['payment_proof'] = $path;
+            }
+            $transaction->update($updateData);
 
             $customerUser = $transaction->customer->user;
             $customerUser->increment('points', $transaction->points_earned);
@@ -194,8 +204,12 @@ class TransactionController extends Controller
             \Illuminate\Support\Facades\Log::warning('Receipt email failed: ' . $e->getMessage());
         }
 
+        $msg = $transaction->payment_method === 'cash'
+            ? 'Cash payment confirmed, points awarded, and receipt sent to email successfully'
+            : 'Payment proof uploaded, points awarded, and receipt sent to email successfully';
+
         return response()->json([
-            'message' => 'Payment proof uploaded, points awarded, and receipt sent to email successfully',
+            'message' => $msg,
             'data' => $transaction,
         ]);
     }

@@ -231,7 +231,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
                   </div>
                 ) : (
                   <div className="p-3 text-center text-xs text-muted-foreground">
-                    Type to search among 1000+ customers...
+                    Type to search customers...
                   </div>
                 )}
                 

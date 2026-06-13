@@ -28,7 +28,7 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedFile) {
+    if (transaction?.payment_method !== 'cash' && !selectedFile) {
       setError('Please select an image file');
       return;
     }
@@ -76,41 +76,50 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
       </div>
 
       {/* Upload Box */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground">Payment Proof Image *</label>
-        
-        {previewUrl ? (
-          <div className="border border-border rounded-lg p-2 bg-background flex flex-col items-center">
-            <img
-              src={previewUrl}
-              alt="Payment Proof Preview"
-              className="max-h-60 rounded-md object-contain border border-border bg-muted w-full"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedFile(null);
-                setPreviewUrl(null);
-              }}
-              className="mt-2 text-xs font-semibold text-destructive hover:underline cursor-pointer"
-            >
-              Remove and Choose Another
-            </button>
-          </div>
-        ) : (
-          <label className="border-2 border-dashed border-border hover:border-primary/50 hover:bg-accent/10 rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer transition-all">
-            <UploadCloud className="h-10 w-10 text-muted-foreground mb-3" />
-            <span className="text-sm font-semibold text-foreground">Click to upload image</span>
-            <span className="text-xs text-muted-foreground mt-1">JPEG, JPG, or PNG (Max. 2MB)</span>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/jpg"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-          </label>
-        )}
-      </div>
+      {transaction?.payment_method === 'cash' ? (
+        <div className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-lg p-4 text-xs space-y-2">
+          <p className="font-semibold text-sm">Pembayaran Tunai (Cash)</p>
+          <p className="text-muted-foreground text-[11px] leading-relaxed">
+            Metode pembayaran transaksi ini adalah <strong>Cash</strong>. Anda tidak perlu mengunggah foto bukti pembayaran. Cukup klik tombol <strong>Confirm & Pay</strong> di bawah untuk memproses dan mengaktifkan poin loyalitas pelanggan.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-foreground">Payment Proof Image *</label>
+          
+          {previewUrl ? (
+            <div className="border border-border rounded-lg p-2 bg-background flex flex-col items-center">
+              <img
+                src={previewUrl}
+                alt="Payment Proof Preview"
+                className="max-h-60 rounded-md object-contain border border-border bg-muted w-full"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedFile(null);
+                  setPreviewUrl(null);
+                }}
+                className="mt-2 text-xs font-semibold text-destructive hover:underline cursor-pointer"
+              >
+                Remove and Choose Another
+              </button>
+            </div>
+          ) : (
+            <label className="border-2 border-dashed border-border hover:border-primary/50 hover:bg-accent/10 rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer transition-all">
+              <UploadCloud className="h-10 w-10 text-muted-foreground mb-3" />
+              <span className="text-sm font-semibold text-foreground">Click to upload image</span>
+              <span className="text-xs text-muted-foreground mt-1">JPEG, JPG, or PNG (Max. 2MB)</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/jpg"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </label>
+          )}
+        </div>
+      )}
 
       {/* Action Buttons */}
       <div className="flex space-x-3 pt-4 border-t border-border mt-6">
@@ -124,7 +133,7 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
         </button>
         <button
           type="submit"
-          disabled={uploading || !selectedFile}
+          disabled={uploading || (transaction?.payment_method !== 'cash' && !selectedFile)}
           className="flex-2 bg-primary text-primary-foreground hover:bg-primary/95 py-2 px-4 rounded-lg font-medium transition-colors cursor-pointer text-sm flex items-center justify-center disabled:opacity-50"
         >
           {uploading ? (
