@@ -126,6 +126,14 @@ export const api = {
   createTransaction: (data: any) => request('/transactions', { method: 'POST', body: data }),
   updateTransactionStatus: (id: number, status: string) => request(`/transactions/${id}/status`, { method: 'PUT', body: { status } }),
   applyVoucher: (id: number, voucherCode: string) => request(`/transactions/${id}/apply-voucher`, { method: 'POST', body: { voucher_code: voucherCode } }),
+  uploadConditionImages: (id: number, file: File) => {
+    const formData = new FormData();
+    formData.append('images[]', file);
+    return request(`/transactions/${id}/condition-images`, {
+      method: 'POST',
+      body: formData,
+    });
+  },
   
   // Upload payment proof
   uploadPaymentProof: (id: number, file: File) => {

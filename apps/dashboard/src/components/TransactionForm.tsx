@@ -34,6 +34,8 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
   const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
+  const [conditionFile, setConditionFile] = useState<File | null>(null);
+  const [conditionPreview, setConditionPreview] = useState<string | null>(null);
   
   // Submit state
   const [loading, setLoading] = useState(false);
@@ -134,7 +136,10 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
     }
 
     try {
-      await api.createTransaction(formData);
+      const res = await api.createTransaction(formData);
+      if (conditionFile && res.data && res.data.id) {
+        await api.uploadConditionImages(res.data.id, conditionFile);
+      }
       onSubmitSuccess();
     } catch (err: any) {
       setError(err.message || 'Failed to create transaction');
@@ -387,6 +392,49 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
                 </label>
               </div>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* Clothes Condition Image */}
+      <div className="space-y-1.5 pt-2 border-t border-border mt-4">
+        <label className="text-sm font-medium text-foreground">Foto Kondisi Baju (Opsional)</label>
+        {conditionPreview ? (
+          <div className="border border-border rounded-lg p-2 bg-muted/40 flex flex-col items-center">
+            <img
+              src={conditionPreview}
+              alt="Kondisi Baju Preview"
+              className="max-h-32 rounded-md object-contain border border-border bg-background"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setConditionFile(null);
+                setConditionPreview(null);
+              }}
+              className="mt-1 text-xs font-semibold text-destructive hover:underline cursor-pointer"
+            >
+              Remove and Choose Another
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center w-full">
+            <label className="border-2 border-dashed border-border hover:border-primary/50 hover:bg-accent/10 rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer transition-all w-full text-center focus-within:ring-2 focus-within:ring-ring focus-within:border-primary">
+              <span className="text-xs font-semibold text-foreground">Click to upload clothes condition photo</span>
+              <span className="text-[10px] text-muted-foreground mt-0.5">JPEG, JPG, or PNG (Max. 5MB)</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/jpg"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setConditionFile(file);
+                    setConditionPreview(URL.createObjectURL(file));
+                  }
+                }}
+                className="sr-only"
+              />
+            </label>
           </div>
         )}
       </div>

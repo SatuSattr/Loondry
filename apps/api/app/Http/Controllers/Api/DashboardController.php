@@ -32,6 +32,7 @@ class DashboardController extends Controller
         $totalRevenue = $revenueQuery->sum('total_price');
         $activeOrders = Transaction::whereNotIn('status', ['diambil'])->count();
         $totalCustomers = Customer::count();
+        $totalLaundryMasuk = Transaction::count();
         
         $recentTransactions = Transaction::with(['customer.user', 'service'])
             ->latest()
@@ -65,6 +66,7 @@ class DashboardController extends Controller
                 'total_revenue' => $totalRevenue,
                 'active_orders' => $activeOrders,
                 'total_customers' => $totalCustomers,
+                'total_laundry_masuk' => $totalLaundryMasuk,
             ],
             'points_summary' => [
                 'total_points_earned' => $totalPointsEarned,

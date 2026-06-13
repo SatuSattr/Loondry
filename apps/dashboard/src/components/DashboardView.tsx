@@ -163,7 +163,7 @@ export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer }: Dashb
       </div>
 
       {/* Main Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {/* Total Revenue */}
         <StatisticsCard
           title="Total Revenue"
@@ -211,6 +211,14 @@ export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer }: Dashb
           }
         />
 
+        {/* Total Laundry Masuk */}
+        <StatisticsCard
+          title="Total Laundry Masuk"
+          value={`${summary?.total_laundry_masuk || 0} Transactions`}
+          status="unknown"
+          range="All Transactions"
+        />
+
         {/* Active Orders */}
         <StatisticsCard
           title="Active Orders"
@@ -223,7 +231,7 @@ export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer }: Dashb
         <StatisticsCard
           title="Total Customers"
           value={`${summary?.total_customers || 0} Customers`}
-          status="unknown"
+          status="within"
           range="Registered Customers"
         />
       </div>

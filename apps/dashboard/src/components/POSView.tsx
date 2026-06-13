@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, getAuthToken, API_BASE } from '../lib/api';
-import { Search, Loader2, CreditCard, Ticket, Printer, RefreshCw, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
+import { Search, Loader2, CreditCard, Ticket, Printer, RefreshCw, SlidersHorizontal, X, ChevronDown, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -19,6 +19,7 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [activeConditionImage, setActiveConditionImage] = useState<string | null>(null);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -301,6 +302,19 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
                           <p className="text-xs text-muted-foreground">
                             {weight} {tx.service?.unit} @ Rp {priceRate.toLocaleString()}/{tx.service?.unit}
                           </p>
+                          {tx.images && tx.images.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const imgPath = tx.images[0].image_path;
+                                setActiveConditionImage(`${API_BASE}/storage/${imgPath}`);
+                              }}
+                              className="mt-1.5 inline-flex items-center space-x-1 text-xs text-primary hover:text-primary/80 hover:underline cursor-pointer bg-primary/5 dark:bg-primary/10 px-2 py-0.5 rounded-md transition-colors border-none"
+                            >
+                              <Camera className="h-3.5 w-3.5 mr-1" />
+                              <span>Lihat Kondisi Baju</span>
+                            </button>
+                          )}
                         </td>
 
                         {/* Billing */}
@@ -419,6 +433,29 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Modal for Clothes Condition Image */}
+      {activeConditionImage && (
+        <div 
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
+          onClick={() => setActiveConditionImage(null)}
+        >
+          <div className="relative max-w-3xl w-full max-h-[80vh] flex flex-col items-center">
+            <button 
+              onClick={() => setActiveConditionImage(null)}
+              className="absolute -top-10 right-0 text-white hover:text-gray-300 bg-black/45 hover:bg-black/60 rounded-full p-1.5 cursor-pointer transition-colors border-none"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <img 
+              src={activeConditionImage} 
+              alt="Kondisi Baju" 
+              className="max-w-full max-h-[75vh] object-contain rounded-lg border border-white/10 shadow-2xl bg-black"
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
         </div>
       )}

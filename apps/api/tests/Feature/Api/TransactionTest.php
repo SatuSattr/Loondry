@@ -180,3 +180,32 @@ test('admin can download transaction receipt', function () {
     $response->assertStatus(200);
     $response->assertHeader('Content-Type', 'application/pdf');
 });
+
+test('admin can upload transaction condition images', function () {
+    Storage::fake('public');
+
+    $this->actingAs($this->admin, 'sanctum');
+
+    $transaction = Transaction::create([
+        'invoice_code' => 'LND-001',
+        'admin_id' => $this->admin->id,
+        'customer_id' => $this->customer->id,
+        'service_id' => $this->service->id,
+        'weight' => 2,
+        'total_price' => 16000,
+        'status' => 'antrian',
+        'payment_method' => 'cash',
+    ]);
+
+    $file = UploadedFile::fake()->image('condition_photo.jpg');
+
+    $response = $this->postJson("/api/transactions/{$transaction->id}/condition-images", [
+        'images' => [$file],
+    ]);
+
+    $response->assertStatus(200);
+    
+    $transaction->refresh();
+    expect($transaction->images)->toHaveCount(1);
+    Storage::disk('public')->assertExists($transaction->images->first()->image_path);
+});
