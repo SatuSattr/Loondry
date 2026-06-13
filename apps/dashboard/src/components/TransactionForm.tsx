@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../lib/api';
-import { Search, Loader2, User, PlusCircle, ChevronDown, Ticket } from 'lucide-react';
+import { Search, Loader2, User, PlusCircle, ChevronDown, Ticket, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -12,7 +12,7 @@ import {
 interface TransactionFormProps {
   onSubmitSuccess: () => void;
   onCancel: () => void;
-  onOpenCreateCustomer: () => void; // Link to easily create a new customer if not found
+  onOpenCreateCustomer: () => void;
 }
 
 export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustomer }: TransactionFormProps) {
@@ -34,8 +34,6 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
   const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
-  const [conditionFile, setConditionFile] = useState<File | null>(null);
-  const [conditionPreview, setConditionPreview] = useState<string | null>(null);
 
   const [paymentTiming, setPaymentTimingState] = useState<'upfront' | 'pickup'>(() => {
     const saved = localStorage.getItem('lnd_payment_timing_pref');
@@ -101,7 +99,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
       } finally {
         setSearchingCustomers(false);
       }
-    }, 300); // 300ms debounce
+    }, 300);
 
     return () => clearTimeout(delayDebounce);
   }, [customerSearch]);
@@ -126,7 +124,6 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
   // Calculate discount from appliedVoucher
   const discount = appliedVoucher ? appliedVoucher.discount : 0;
   const finalTotal = Math.max(0, subtotal - discount);
-
 
   // Points configuration: 1 point per 1000 IDR of paid amount
   const pointsEarned = Math.floor(finalTotal / 1000);
@@ -189,22 +186,19 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
     formData.append('customer_id', String(selectedCustomer.id));
     formData.append('service_id', String(selectedService.id));
     formData.append('weight', String(numericWeight));
-    formData.append('payment_method', paymentMethod);
     formData.append('payment_status', paymentTiming === 'upfront' ? 'paid' : 'pending');
-    if (paymentTiming === 'upfront' && ['transfer', 'qris'].includes(paymentMethod) && paymentProofFile) {
-      formData.append('payment_proof', paymentProofFile);
-    }
-    if (appliedVoucher) {
-      formData.append('voucher_code', appliedVoucher.code);
+    if (paymentTiming === 'upfront') {
+      formData.append('payment_method', paymentMethod);
+      if (['transfer', 'qris'].includes(paymentMethod) && paymentProofFile) {
+        formData.append('payment_proof', paymentProofFile);
+      }
+      if (appliedVoucher) {
+        formData.append('voucher_code', appliedVoucher.code);
+      }
     }
 
     try {
-      const res = await api.createTransaction(formData);
-      const transactionId = res.data?.id;
-
-      if (conditionFile && transactionId) {
-        await api.uploadConditionImages(transactionId, conditionFile);
-      }
+      await api.createTransaction(formData);
       onSubmitSuccess();
     } catch (err: any) {
       setError(err.message || 'Failed to create transaction');
@@ -221,7 +215,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
         </div>
       )}
 
-      {/* Customer Selection */}
+      {/* 1. Customer Selection */}
       <div className="space-y-1 relative" ref={dropdownRef}>
         <label className="text-sm font-medium text-foreground">Select Customer *</label>
         
@@ -317,9 +311,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
         )}
       </div>
 
-
-
-      {/* Service Selection */}
+      {/* 2. Service Selection */}
       <div className="space-y-1">
         <label className="text-sm font-medium text-foreground">Service *</label>
         {loadingServices ? (
@@ -361,7 +353,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
         )}
       </div>
 
-      {/* Weight / Quantity */}
+      {/* 3. Weight / Quantity */}
       <div className="space-y-1">
         <label className="text-sm font-medium text-foreground">
           Weight / Quantity ({unit}) *
@@ -378,184 +370,142 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
         />
       </div>
 
-      {/* Payment Method */}
-      <div className="space-y-1">
-        <label className="text-sm font-medium text-foreground">Payment Method *</label>
-        <div className="grid grid-cols-3 gap-3">
-          <label className={`flex items-center justify-center border rounded-lg p-2.5 cursor-pointer text-xs font-medium transition-all focus-within:ring-2 focus-within:ring-ring focus-within:border-primary ${
-            paymentMethod === 'cash'
-              ? 'border-primary bg-primary/5 text-primary'
-              : 'border-border bg-background hover:bg-accent text-foreground'
-          }`}>
-            <input
-              type="radio"
-              name="paymentMethod"
-              value="cash"
-              checked={paymentMethod === 'cash'}
-              onChange={() => {
-                setPaymentMethod('cash');
-                setPaymentTiming('upfront');
-                setPaymentProofFile(null);
-                setPaymentProofPreview(null);
-              }}
-              className="sr-only"
-            />
-            Cash
-          </label>
-          <label className={`flex items-center justify-center border rounded-lg p-2.5 cursor-pointer text-xs font-medium transition-all focus-within:ring-2 focus-within:ring-ring focus-within:border-primary ${
-            paymentMethod === 'transfer'
-              ? 'border-primary bg-primary/5 text-primary'
-              : 'border-border bg-background hover:bg-accent text-foreground'
-          }`}>
-            <input
-              type="radio"
-              name="paymentMethod"
-              value="transfer"
-              checked={paymentMethod === 'transfer'}
-              onChange={() => setPaymentMethod('transfer')}
-              className="sr-only"
-            />
-            Transfer
-          </label>
-          <label className={`flex items-center justify-center border rounded-lg p-2.5 cursor-pointer text-xs font-medium transition-all focus-within:ring-2 focus-within:ring-ring focus-within:border-primary ${
-            paymentMethod === 'qris'
-              ? 'border-primary bg-primary/5 text-primary'
-              : 'border-border bg-background hover:bg-accent text-foreground'
-          }`}>
-            <input
-              type="radio"
-              name="paymentMethod"
-              value="qris"
-              checked={paymentMethod === 'qris'}
-              onChange={() => setPaymentMethod('qris')}
-              className="sr-only"
-            />
-            QRIS
-          </label>
+      {/* 4. Payment Period (Waktu Pembayaran) */}
+      <div className="space-y-1.5">
+        <label className="text-sm font-medium text-foreground">Waktu Pembayaran *</label>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => setPaymentTiming('upfront')}
+            className={`py-2 px-3 border rounded-lg text-xs font-medium cursor-pointer transition-all ${
+              paymentTiming === 'upfront'
+                ? 'border-primary bg-primary/5 text-primary font-semibold'
+                : 'border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground'
+            }`}
+          >
+            Bayar Sekarang (Upfront)
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setPaymentTiming('pickup');
+              setPaymentProofFile(null);
+              setPaymentProofPreview(null);
+            }}
+            className={`py-2 px-3 border rounded-lg text-xs font-medium cursor-pointer transition-all ${
+              paymentTiming === 'pickup'
+                ? 'border-primary bg-primary/5 text-primary font-semibold'
+                : 'border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground'
+            }`}
+          >
+            Bayar Nanti (Saat Diambil)
+          </button>
         </div>
-
-        {/* Payment Timing */}
-        <div className="space-y-1.5 pt-3">
-          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Waktu Pembayaran *</label>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => setPaymentTiming('upfront')}
-              className={`py-2 px-3 border rounded-lg text-xs font-medium cursor-pointer transition-all ${
-                paymentTiming === 'upfront'
-                  ? 'border-primary bg-primary/5 text-primary font-semibold'
-                  : 'border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground'
-              }`}
-            >
-              Bayar Sekarang (Upfront)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setPaymentTiming('pickup');
-                setPaymentProofFile(null);
-                setPaymentProofPreview(null);
-              }}
-              className={`py-2 px-3 border rounded-lg text-xs font-medium cursor-pointer transition-all ${
-                paymentTiming === 'pickup'
-                  ? 'border-primary bg-primary/5 text-primary font-semibold'
-                  : 'border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground'
-              }`}
-            >
-              Bayar Nanti (Saat Diambil)
-            </button>
-          </div>
-        </div>
-
-        {['transfer', 'qris'].includes(paymentMethod) && paymentTiming === 'upfront' && (
-          <div className="space-y-1.5 pt-2 animate-in fade-in-50 duration-200">
-            <label className="text-sm font-semibold text-foreground">Payment Proof Image *</label>
-            {paymentProofPreview ? (
-              <div className="border border-border rounded-lg p-2 bg-muted/40 flex flex-col items-center">
-                <img
-                  src={paymentProofPreview}
-                  alt="Payment Proof Preview"
-                  className="max-h-32 rounded-md object-contain border border-border bg-background"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPaymentProofFile(null);
-                    setPaymentProofPreview(null);
-                  }}
-                  className="mt-1 text-xs font-semibold text-destructive hover:underline cursor-pointer"
-                >
-                  Remove and Choose Another
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center w-full">
-                <label className="border-2 border-dashed border-border hover:border-primary/50 hover:bg-accent/10 rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer transition-all w-full text-center focus-within:ring-2 focus-within:ring-ring focus-within:border-primary">
-                  <span className="text-xs font-semibold text-foreground">Click to upload payment proof</span>
-                  <span className="text-[10px] text-muted-foreground mt-0.5">JPEG, JPG, or PNG (Max. 2MB)</span>
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/jpg"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        setPaymentProofFile(file);
-                        setPaymentProofPreview(URL.createObjectURL(file));
-                      }
-                    }}
-                    className="sr-only"
-                  />
-                </label>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* Clothes Condition Image */}
-      <div className="space-y-1.5 pt-2 border-t border-border mt-4">
-        <label className="text-sm font-medium text-foreground">Foto Kondisi Baju (Opsional)</label>
-        {conditionPreview ? (
-          <div className="border border-border rounded-lg p-2 bg-muted/40 flex flex-col items-center">
-            <img
-              src={conditionPreview}
-              alt="Kondisi Baju Preview"
-              className="max-h-32 rounded-md object-contain border border-border bg-background"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                setConditionFile(null);
-                setConditionPreview(null);
-              }}
-              className="mt-1 text-xs font-semibold text-destructive hover:underline cursor-pointer"
-            >
-              Remove and Choose Another
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center w-full">
-            <label className="border-2 border-dashed border-border hover:border-primary/50 hover:bg-accent/10 rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer transition-all w-full text-center focus-within:ring-2 focus-within:ring-ring focus-within:border-primary">
-              <span className="text-xs font-semibold text-foreground">Click to upload clothes condition photo</span>
-              <span className="text-[10px] text-muted-foreground mt-0.5">JPEG, JPG, or PNG (Max. 5MB)</span>
+      {/* 5. Payment Method (Hanya muncul jika Bayar Sekarang / upfront) */}
+      {paymentTiming === 'upfront' && (
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-foreground">Payment Method *</label>
+          <div className="grid grid-cols-3 gap-3">
+            <label className={`flex items-center justify-center border rounded-lg p-2.5 cursor-pointer text-xs font-medium transition-all focus-within:ring-2 focus-within:ring-ring focus-within:border-primary ${
+              paymentMethod === 'cash'
+                ? 'border-primary bg-primary/5 text-primary'
+                : 'border-border bg-background hover:bg-accent text-foreground'
+            }`}>
               <input
-                type="file"
-                accept="image/jpeg,image/png,image/jpg"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    setConditionFile(file);
-                    setConditionPreview(URL.createObjectURL(file));
-                  }
+                type="radio"
+                name="paymentMethod"
+                value="cash"
+                checked={paymentMethod === 'cash'}
+                onChange={() => {
+                  setPaymentMethod('cash');
+                  setPaymentProofFile(null);
+                  setPaymentProofPreview(null);
                 }}
                 className="sr-only"
               />
+              Cash
+            </label>
+            <label className={`flex items-center justify-center border rounded-lg p-2.5 cursor-pointer text-xs font-medium transition-all focus-within:ring-2 focus-within:ring-ring focus-within:border-primary ${
+              paymentMethod === 'transfer'
+                ? 'border-primary bg-primary/5 text-primary'
+                : 'border-border bg-background hover:bg-accent text-foreground'
+            }`}>
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="transfer"
+                checked={paymentMethod === 'transfer'}
+                onChange={() => setPaymentMethod('transfer')}
+                className="sr-only"
+              />
+              Transfer
+            </label>
+            <label className={`flex items-center justify-center border rounded-lg p-2.5 cursor-pointer text-xs font-medium transition-all focus-within:ring-2 focus-within:ring-ring focus-within:border-primary ${
+              paymentMethod === 'qris'
+                ? 'border-primary bg-primary/5 text-primary'
+                : 'border-border bg-background hover:bg-accent text-foreground'
+            }`}>
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="qris"
+                checked={paymentMethod === 'qris'}
+                onChange={() => setPaymentMethod('qris')}
+                className="sr-only"
+              />
+              QRIS
             </label>
           </div>
-        )}
-      </div>
 
-      {/* Voucher Selection */}
+          {['transfer', 'qris'].includes(paymentMethod) && (
+            <div className="space-y-1.5 pt-2 animate-in fade-in-50 duration-200">
+              <label className="text-sm font-semibold text-foreground">Payment Proof Image *</label>
+              {paymentProofPreview ? (
+                <div className="border border-border rounded-lg p-2 bg-muted/40 flex flex-col items-center">
+                  <img
+                    src={paymentProofPreview}
+                    alt="Payment Proof Preview"
+                    className="max-h-32 rounded-md object-contain border border-border bg-background"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentProofFile(null);
+                      setPaymentProofPreview(null);
+                    }}
+                    className="mt-1 text-xs font-semibold text-destructive hover:underline cursor-pointer"
+                  >
+                    Remove and Choose Another
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center w-full">
+                  <label className="border-2 border-dashed border-border hover:border-primary/50 hover:bg-accent/10 rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer transition-all w-full text-center focus-within:ring-2 focus-within:ring-ring focus-within:border-primary">
+                    <span className="text-xs font-semibold text-foreground">Click to upload payment proof</span>
+                    <span className="text-[10px] text-muted-foreground mt-0.5">JPEG, JPG, or PNG (Max. 2MB)</span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/jpg"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setPaymentProofFile(file);
+                          setPaymentProofPreview(URL.createObjectURL(file));
+                        }
+                      }}
+                      className="sr-only"
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 6. Voucher Selection (Hanya muncul jika customer terpilih dan Bayar Sekarang / upfront) */}
       {selectedCustomer && paymentTiming === 'upfront' && (
         <div className="space-y-2 p-3.5 bg-muted/30 border border-border rounded-xl">
           <div className="flex items-center space-x-1.5 text-xs font-semibold text-foreground">
@@ -574,12 +524,13 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
               type="button"
               onClick={handleApplyVoucher}
               disabled={checkingVoucher || !voucherCode.trim()}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-1.5 rounded-lg text-sm font-semibold transition-all cursor-pointer disabled:opacity-50"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center min-w-10"
+              title="Terapkan Voucher"
             >
               {checkingVoucher ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                'Terapkan'
+                <Check className="h-4 w-4" />
               )}
             </button>
           </div>
@@ -592,7 +543,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
         </div>
       )}
 
-      {/* Summary Box */}
+      {/* 7. Summary Box */}
       <div className="bg-muted p-4 rounded-lg space-y-3 text-sm border border-border">
         <h4 className="font-semibold text-foreground tracking-tight">Order Summary</h4>
         <div className="flex justify-between">
@@ -623,7 +574,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
         </div>
       </div>
 
-      {/* Action Buttons */}
+      {/* 8. Action Buttons */}
       <div className="flex space-x-3 pt-4 border-t border-border mt-6">
         <button
           type="button"

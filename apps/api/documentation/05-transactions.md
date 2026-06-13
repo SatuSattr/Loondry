@@ -67,7 +67,7 @@ POST /api/transactions
 | `customer_id` | integer | yes | Must reference an existing customer |
 | `service_id` | integer | yes | Must reference an existing service |
 | `weight` | number | yes | Minimum 0.1 |
-| `payment_method` | string | yes | Must be `cash`, `transfer`, or `qris` |
+| `payment_method` | string | conditional | Required if `payment_status` is `paid`. Optional/nullable if `payment_status` is `pending`. Must be `cash`, `transfer`, or `qris` |
 | `payment_status` | string | yes | Must be `pending` or `paid` |
 | `payment_proof` | file | no | Proof image required if `payment_status` is `paid` and method is `transfer` or `qris` |
 | `voucher_code` | string | no | Redeemed voucher code to apply discount (only allowed when `payment_status` is `paid`) |
@@ -362,7 +362,8 @@ POST /api/transactions/{transaction}/payment
 
 | Field | Type | Required | Validation |
 |-------|------|----------|------------|
-| `payment_proof` | file | yes | Image (jpg, jpeg, png), max 2MB (2048 KB). Optional/nullable only if `payment_method` is `cash`. |
+| `payment_method` | string | conditional | Required if the transaction does not have a payment method saved yet. Must be one of `cash`, `transfer`, or `qris`. |
+| `payment_proof` | file | conditional | Required if the chosen payment method is `transfer` or `qris`. Optional/nullable only if `payment_method` is `cash`. Image (jpg, jpeg, png), max 2MB (2048 KB). |
 | `voucher_code` | string | no | Redeemed voucher code to apply discount during payment pelunasan. |
 
 ### Response `200 OK`

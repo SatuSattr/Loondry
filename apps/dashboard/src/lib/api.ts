@@ -136,13 +136,16 @@ export const api = {
   },
   
   // Upload payment proof
-  uploadPaymentProof: (id: number, file?: File | null, voucherCode?: string) => {
+  uploadPaymentProof: (id: number, file?: File | null, voucherCode?: string, paymentMethod?: string) => {
     const formData = new FormData();
     if (file) {
       formData.append('payment_proof', file);
     }
     if (voucherCode) {
       formData.append('voucher_code', voucherCode);
+    }
+    if (paymentMethod) {
+      formData.append('payment_method', paymentMethod);
     }
     return request(`/transactions/${id}/payment`, {
       method: 'POST',

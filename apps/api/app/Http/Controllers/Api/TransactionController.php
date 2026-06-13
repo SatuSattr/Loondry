@@ -218,10 +218,17 @@ class TransactionController extends Controller
     public function uploadPaymentProof(Request $request, Transaction $transaction)
     {
         $this->authorizeTransaction($transaction);
+        
+        $method = $request->input('payment_method', $transaction->payment_method);
+        
         $request->validate([
-            'payment_proof' => $transaction->payment_method === 'cash'
-                ? ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048']
-                : ['required', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
+            'payment_method' => [$transaction->payment_method ? 'nullable' : 'required', 'string', 'in:cash,transfer,qris'],
+            'payment_proof' => [
+                (in_array($method, ['transfer', 'qris']) && !$transaction->payment_proof) ? 'required' : 'nullable',
+                'image',
+                'mimes:jpg,jpeg,png',
+                'max:2048'
+            ],
             'voucher_code' => ['nullable', 'string'],
         ]);
 
@@ -257,7 +264,7 @@ class TransactionController extends Controller
             $path = $request->file('payment_proof')->store('payment_proofs', 'public');
         }
 
-        DB::transaction(function () use ($path, $transaction, $discount, $redemption, $points_earned) {
+        DB::transaction(function () use ($path, $transaction, $discount, $redemption, $points_earned, $request) {
             $updateData = [
                 'payment_status' => 'paid',
                 'paid_at' => now(),
@@ -265,6 +272,9 @@ class TransactionController extends Controller
             ];
             if ($path !== null) {
                 $updateData['payment_proof'] = $path;
+            }
+            if ($request->filled('payment_method')) {
+                $updateData['payment_method'] = $request->payment_method;
             }
             if ($redemption) {
                 $updateData['discount'] = $discount;

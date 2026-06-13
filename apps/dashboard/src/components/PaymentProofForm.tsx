@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { api } from '../lib/api';
-import { Loader2, UploadCloud, Ticket } from 'lucide-react';
+import { Loader2, UploadCloud, Ticket, Check } from 'lucide-react';
 
 interface PaymentProofFormProps {
   transaction: any;
@@ -15,12 +15,17 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
 
+  // Payment Method state (only used if transaction.payment_method is null)
+  const [paymentMethod, setPaymentMethod] = useState(transaction?.payment_method || 'cash');
+
   // Voucher states
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState<{ code: string; discount: number; name: string } | null>(null);
   const [checkingVoucher, setCheckingVoucher] = useState(false);
   const [voucherError, setVoucherError] = useState('');
   const [voucherSuccessMsg, setVoucherSuccessMsg] = useState('');
+
+  const currentPaymentMethod = transaction?.payment_method || paymentMethod;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -67,7 +72,7 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (transaction?.payment_method !== 'cash' && !selectedFile) {
+    if (currentPaymentMethod !== 'cash' && !selectedFile) {
       setError('Please select an image file');
       return;
     }
@@ -76,7 +81,12 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
     setError('');
 
     try {
-      await api.uploadPaymentProof(transaction.id, selectedFile, appliedVoucher?.code);
+      await api.uploadPaymentProof(
+        transaction.id,
+        selectedFile,
+        appliedVoucher?.code,
+        !transaction?.payment_method ? paymentMethod : undefined
+      );
       onSubmitSuccess();
     } catch (err: any) {
       setError(err.message || 'Failed to upload payment proof');
@@ -123,6 +133,64 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
         </div>
       </div>
 
+      {/* Payment Method Selector (Only if not set on transaction yet) */}
+      {!transaction?.payment_method && (
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-foreground">Payment Method *</label>
+          <div className="grid grid-cols-3 gap-3">
+            <label className={`flex items-center justify-center border rounded-lg p-2.5 cursor-pointer text-xs font-medium transition-all focus-within:ring-2 focus-within:ring-ring focus-within:border-primary ${
+              paymentMethod === 'cash'
+                ? 'border-primary bg-primary/5 text-primary font-semibold'
+                : 'border-border bg-background hover:bg-accent text-foreground'
+            }`}>
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="cash"
+                checked={paymentMethod === 'cash'}
+                onChange={() => {
+                  setPaymentMethod('cash');
+                  setSelectedFile(null);
+                  setPreviewUrl(null);
+                }}
+                className="sr-only"
+              />
+              Cash
+            </label>
+            <label className={`flex items-center justify-center border rounded-lg p-2.5 cursor-pointer text-xs font-medium transition-all focus-within:ring-2 focus-within:ring-ring focus-within:border-primary ${
+              paymentMethod === 'transfer'
+                ? 'border-primary bg-primary/5 text-primary font-semibold'
+                : 'border-border bg-background hover:bg-accent text-foreground'
+            }`}>
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="transfer"
+                checked={paymentMethod === 'transfer'}
+                onChange={() => setPaymentMethod('transfer')}
+                className="sr-only"
+              />
+              Transfer
+            </label>
+            <label className={`flex items-center justify-center border rounded-lg p-2.5 cursor-pointer text-xs font-medium transition-all focus-within:ring-2 focus-within:ring-ring focus-within:border-primary ${
+              paymentMethod === 'qris'
+                ? 'border-primary bg-primary/5 text-primary font-semibold'
+                : 'border-border bg-background hover:bg-accent text-foreground'
+            }`}>
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="qris"
+                checked={paymentMethod === 'qris'}
+                onChange={() => setPaymentMethod('qris')}
+                className="sr-only"
+              />
+              QRIS
+            </label>
+          </div>
+        </div>
+      )}
+
       {/* Voucher Code Input (Only if the transaction doesn't have a voucher applied already) */}
       {!transaction?.voucher_code && (
         <div className="space-y-2 p-3 bg-muted/40 border border-border rounded-lg">
@@ -142,12 +210,13 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
               type="button"
               onClick={handleApplyVoucher}
               disabled={checkingVoucher || !voucherCode.trim()}
-              className="bg-primary text-primary-foreground hover:bg-primary/95 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+              className="bg-primary text-primary-foreground hover:bg-primary/95 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center min-w-8"
+              title="Terapkan Voucher"
             >
               {checkingVoucher ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
               ) : (
-                'Terapkan'
+                <Check className="h-3 w-3" />
               )}
             </button>
           </div>
@@ -161,7 +230,7 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
       )}
 
       {/* Upload Box */}
-      {transaction?.payment_method === 'cash' ? (
+      {currentPaymentMethod === 'cash' ? (
         <div className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-lg p-4 text-xs space-y-2">
           <p className="font-semibold text-sm">Pembayaran Cash</p>
           <p className="text-muted-foreground text-[11px] leading-relaxed">
@@ -218,7 +287,7 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
         </button>
         <button
           type="submit"
-          disabled={uploading || (transaction?.payment_method !== 'cash' && !selectedFile)}
+          disabled={uploading || (currentPaymentMethod !== 'cash' && !selectedFile)}
           className="flex-2 bg-primary text-primary-foreground hover:bg-primary/95 py-2 px-4 rounded-lg font-medium transition-colors cursor-pointer text-sm flex items-center justify-center disabled:opacity-50"
         >
           {uploading ? (

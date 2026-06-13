@@ -45,6 +45,21 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
   // Action loading states
   const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null);
   const [printingId, setPrintingId] = useState<number | null>(null);
+  const [uploadingConditionId, setUploadingConditionId] = useState<number | null>(null);
+
+  const handleUploadConditionFile = async (id: number, file: File) => {
+    try {
+      await api.uploadConditionImages(id, file);
+      // reload transactions so the new image path is loaded
+      const res = await api.getTransactions();
+      setTransactions(res.data || []);
+      alert('Foto kondisi baju berhasil diunggah!');
+    } catch (err: any) {
+      alert(err.message || 'Gagal mengunggah foto kondisi baju');
+    } finally {
+      setUploadingConditionId(null);
+    }
+  };
 
   const loadTransactions = async () => {
     setLoading(true);
@@ -437,6 +452,23 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
                                 <Printer className="h-4 w-4" />
                               )}
                             </button>
+
+                            {/* Upload Condition Image */}
+                            <button
+                              disabled={uploadingConditionId !== null}
+                              onClick={() => {
+                                setUploadingConditionId(tx.id);
+                                document.getElementById('condition-image-upload-input')?.click();
+                              }}
+                              className="p-1.5 rounded-md border border-border bg-background hover:bg-accent text-foreground transition-all cursor-pointer disabled:opacity-50"
+                              title="Upload Foto Kondisi Baju"
+                            >
+                              {uploadingConditionId === tx.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Camera className="h-4 w-4" />
+                              )}
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -477,6 +509,22 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
           </div>
         </div>
       )}
+
+      <input
+        type="file"
+        id="condition-image-upload-input"
+        accept="image/jpeg,image/png,image/jpg"
+        className="hidden"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (file && uploadingConditionId) {
+            await handleUploadConditionFile(uploadingConditionId, file);
+            e.target.value = '';
+          } else {
+            setUploadingConditionId(null);
+          }
+        }}
+      />
 
       {confirmingTxId !== null && (
         <ErrorDialog
