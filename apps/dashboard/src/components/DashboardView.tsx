@@ -13,6 +13,7 @@ import {
   Loader2,
   ChevronDown,
   Calendar as CalendarIcon,
+  Keyboard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,9 +30,10 @@ import StatisticsCard from './shadcn-studio/blocks/statistics-with-status';
 interface DashboardViewProps {
   onOpenCreateOrder: () => void;
   onOpenCreateCustomer: () => void;
+  onOpenShortcuts: () => void;
 }
 
-export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer }: DashboardViewProps) {
+export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer, onOpenShortcuts }: DashboardViewProps) {
   const [revenueRange, setRevenueRange] = useState('all');
   const [data, setData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
@@ -141,6 +143,14 @@ export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer }: Dashb
           <p className="text-sm text-muted-foreground">Manage laundry operations and customer points in real-time.</p>
         </div>
         <div className="flex space-x-2">
+          {/* Keyboard Shortcuts Button */}
+          <button
+            onClick={onOpenShortcuts}
+            className="p-2 border border-border bg-background hover:bg-accent rounded-lg text-foreground transition-all cursor-pointer"
+            title="Keyboard Shortcuts"
+          >
+            <Keyboard className="h-4 w-4" />
+          </button>
           <button
             onClick={() => {
               const start = dateRange?.from ? formatDate(dateRange.from) : undefined;
@@ -148,7 +158,7 @@ export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer }: Dashb
               loadDashboardData(revenueRange, false, start, end);
             }}
             className="p-2 border border-border bg-background hover:bg-accent rounded-lg text-foreground transition-all cursor-pointer"
-            title="Refresh statistics"
+            title="Refresh dashboard stats"
           >
             <RefreshCw className="h-4 w-4" />
           </button>

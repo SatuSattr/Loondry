@@ -309,6 +309,7 @@ export default function App() {
           <DashboardView
             onOpenCreateOrder={() => setSlideOverType('create-order')}
             onOpenCreateCustomer={() => setSlideOverType('create-customer')}
+            onOpenShortcuts={() => setSlideOverType('shortcuts-info')}
           />
         );
       case 'pos':
