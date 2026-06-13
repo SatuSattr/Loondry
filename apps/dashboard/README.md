@@ -1,73 +1,111 @@
-# React + TypeScript + Vite
+# Loondry Web Admin Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern, high-performance laundry Point of Sales (POS) management panel built with **Vite, React, TypeScript, and shadcn/ui**. It communicates with the Laravel REST API backend to process orders, manage customers, configure services, and handle loyalty/voucher redemptions.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🚀 Key Features
 
-## React Compiler
+* **POS Transaction System**: Easily place orders, calculate pricing based on service rates and weights, and print invoices.
+* **Order Tracking**: Real-time progress updates for orders (Queue, Washing, Ironing, Ready to Pick Up, Completed).
+* **Customer Management**: Profile registries, tracking phone numbers, and managing accumulated loyalty points.
+* **Loyalty & Vouchers**: Set point-exchange voucher templates and review redemption logs.
+* **Service Master Catalog**: Manage washing/dry cleaning service types, unit types, and pricing.
+* **Seamless Navigation**: Zero-latency page switching powered by a custom client-side prefetching and caching layer.
+* **Dark Mode**: Complete light and dark mode styling with automatic theme persistence.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## ⌨️ Cashier Keyboard Shortcuts
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+To maximize operation speed, the dashboard is equipped with dedicated keyboard shortcuts to let cashiers work entirely without a mouse.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+| Shortcut | Action | Context |
+| :--- | :--- | :--- |
+| **`F2`** or **`Alt + N`** | Open New Order Form | Global |
+| **`F3`** or **`Alt + C`** | Open Register Customer Form | Global |
+| **`Esc`** | Close Open Form/Drawer | Global |
+| **`Ctrl + Enter`** | Submit Active Form | Inside any input fields |
+| **`/` (Slash)** | Focus Search Bar | Global (When not typing) |
+| **`Alt + 1`** | Navigate to Dashboard | Global |
+| **`Alt + 2`** | Navigate to Transactions | Global |
+| **`Alt + 3`** | Navigate to Customers | Global |
+| **`Alt + 4`** | Navigate to Services | Global |
+| **`Alt + 5`** | Navigate to Vouchers | Global |
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+*Form elements are designed with semantic tab indexes, focus rings, and full keyboard focus access (including custom select lists and file uploads).*
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+---
+
+## 🛠️ Installation & Getting Started
+
+### Prerequisites
+
+* **Node.js**: >= 20.x
+* **npm** or **yarn**
+* **REST API Backend**: Make sure the backend server (Laravel) is running.
+
+### 1. Setup Dependencies
+From the repository root, navigate into the dashboard folder and install packages:
+```bash
+cd apps/dashboard
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 2. Environment Configuration
+Create a local `.env` file by copying the example template:
+```bash
+cp .env.example .env
 ```
+Open `.env` and set your API backend host:
+```env
+VITE_API_URL=http://localhost:8000
+```
+
+### 3. Running Development Server
+Launch the hot-reloading development server:
+```bash
+npm run dev
+```
+The application will default to [http://localhost:5173](http://localhost:5173).
+
+### 4. Build for Production
+To compile a minimized production bundle:
+```bash
+npm run build
+```
+This generates optimized HTML, CSS, and JS assets in the `dist` directory.
+
+---
+
+## 📂 Folder Structure
+
+```
+apps/dashboard/
+├── public/                 # Static assets
+├── src/
+│   ├── components/         # Page Views & Action Forms
+│   │   ├── ui/             # Accessible UI Primitives (shadcn/base-ui)
+│   │   ├── DashboardView.tsx
+│   │   ├── POSView.tsx
+│   │   ├── CustomersView.tsx
+│   │   ├── ServicesView.tsx
+│   │   ├── VouchersView.tsx
+│   │   └── ...
+│   ├── lib/
+│   │   └── api.ts          # Axios-like Fetch wrapper & Caching layer
+│   ├── App.tsx             # Main Layout shell & Keyboard listener
+│   ├── index.css           # Core styling and theme configuration
+│   └── main.tsx            # React application entry point
+├── .env.example
+├── tsconfig.json           # TypeScript configuration
+└── vite.config.ts          # Vite configuration
+```
+
+---
+
+## 🔌 API & Caching Layer
+
+The dashboard handles API requests inside `src/lib/api.ts`. To prevent double-fetching on page prefetching, a lightweight client-side cache is integrated:
+* **GET Requests**: Responses are cached for 5 seconds. If the application requests the same endpoint within this window (e.g., when transitioning tabs), it loads instantly.
+* **Mutations**: Any write requests (`POST`, `PUT`, `DELETE`) automatically purge the cache to guarantee the cashier always sees fresh, up-to-date data.

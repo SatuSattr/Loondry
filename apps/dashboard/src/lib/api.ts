@@ -1,4 +1,5 @@
-const API_BASE_URL = 'http://localhost:8000/api';
+export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = `${API_BASE}/api`;
 
 export function getAuthToken(): string | null {
   return localStorage.getItem('lnd_token');
@@ -29,7 +30,28 @@ interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: any;
 }
 
+const cache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_DURATION = 5000; // 5 seconds
+
+export function clearApiCache() {
+  cache.clear();
+}
+
 async function request(endpoint: string, options: RequestOptions = {}) {
+  const method = options.method || 'GET';
+  const isGet = method.toUpperCase() === 'GET';
+  const cacheKey = `${endpoint}_${JSON.stringify(options)}`;
+
+  if (isGet) {
+    const cached = cache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      return cached.data;
+    }
+  } else {
+    // Clear cache on mutations (POST, PUT, DELETE, etc.)
+    cache.clear();
+  }
+
   const token = getAuthToken();
   const headers = new Headers(options.headers || {});
   
@@ -63,7 +85,13 @@ async function request(endpoint: string, options: RequestOptions = {}) {
     throw new Error(errorData.message || errorData.error || `HTTP error! status: ${response.status}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  
+  if (isGet) {
+    cache.set(cacheKey, { data, timestamp: Date.now() });
+  }
+
+  return data;
 }
 
 export const api = {

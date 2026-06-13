@@ -202,22 +202,23 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
                   </div>
                 ) : customers.length > 0 ? (
                   customers.map((c) => (
-                    <div
+                    <button
                       key={c.id}
+                      type="button"
                       onClick={() => {
                         setSelectedCustomer(c);
                         setShowDropdown(false);
                       }}
-                      className="p-3 hover:bg-accent hover:text-accent-foreground cursor-pointer flex justify-between items-center text-sm"
+                      className="w-full text-left p-3 hover:bg-accent hover:text-accent-foreground cursor-pointer flex justify-between items-center text-sm transition-colors focus:bg-accent focus:text-accent-foreground outline-hidden border-none"
                     >
-                      <div>
-                        <p className="font-medium">{c.user?.name}</p>
+                      <div className="text-left">
+                        <p className="font-medium text-foreground">{c.user?.name}</p>
                         <p className="text-xs text-muted-foreground">{c.phone} • {c.user?.email}</p>
                       </div>
-                      <span className="text-xs bg-emerald-500/10 text-emerald-500 font-semibold px-2 py-0.5 rounded-full">
+                      <span className="text-xs bg-emerald-500/10 text-emerald-500 font-semibold px-2 py-0.5 rounded-full shrink-0">
                         {c.user?.points || 0} pts
                       </span>
-                    </div>
+                    </button>
                   ))
                 ) : customerSearch.trim() ? (
                   <div className="p-3 text-center text-xs text-muted-foreground">
@@ -229,16 +230,17 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
                   </div>
                 )}
                 
-                <div
+                <button
+                  type="button"
                   onClick={() => {
                     setShowDropdown(false);
                     onOpenCreateCustomer();
                   }}
-                  className="p-3 text-center text-sm text-primary hover:bg-accent cursor-pointer font-medium flex items-center justify-center space-x-1.5"
+                  className="w-full p-3 text-center text-sm text-primary hover:bg-accent cursor-pointer font-medium flex items-center justify-center space-x-1.5 focus:bg-accent outline-hidden border-none"
                 >
                   <PlusCircle className="h-4 w-4" />
                   <span>Register New Customer</span>
-                </div>
+                </button>
               </div>
             )}
           </div>
@@ -307,7 +309,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
       <div className="space-y-1">
         <label className="text-sm font-medium text-foreground">Payment Method *</label>
         <div className="grid grid-cols-2 gap-4">
-          <label className={`flex items-center justify-center border rounded-lg p-3 cursor-pointer text-sm font-medium transition-all ${
+          <label className={`flex items-center justify-center border rounded-lg p-3 cursor-pointer text-sm font-medium transition-all focus-within:ring-2 focus-within:ring-ring focus-within:border-primary ${
             paymentMethod === 'cash'
               ? 'border-primary bg-primary/5 text-primary'
               : 'border-border bg-background hover:bg-accent text-foreground'
@@ -326,7 +328,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
             />
             Cash
           </label>
-          <label className={`flex items-center justify-center border rounded-lg p-3 cursor-pointer text-sm font-medium transition-all ${
+          <label className={`flex items-center justify-center border rounded-lg p-3 cursor-pointer text-sm font-medium transition-all focus-within:ring-2 focus-within:ring-ring focus-within:border-primary ${
             paymentMethod === 'transfer'
               ? 'border-primary bg-primary/5 text-primary'
               : 'border-border bg-background hover:bg-accent text-foreground'
@@ -366,7 +368,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
               </div>
             ) : (
               <div className="flex items-center justify-center w-full">
-                <label className="border-2 border-dashed border-border hover:border-primary/50 hover:bg-accent/10 rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer transition-all w-full text-center">
+                <label className="border-2 border-dashed border-border hover:border-primary/50 hover:bg-accent/10 rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer transition-all w-full text-center focus-within:ring-2 focus-within:ring-ring focus-within:border-primary">
                   <span className="text-xs font-semibold text-foreground">Click to upload payment proof</span>
                   <span className="text-[10px] text-muted-foreground mt-0.5">JPEG, JPG, or PNG (Max. 2MB)</span>
                   <input
@@ -379,7 +381,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
                         setPaymentProofPreview(URL.createObjectURL(file));
                       }
                     }}
-                    className="hidden"
+                    className="sr-only"
                   />
                 </label>
               </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, getAuthToken } from '../lib/api';
+import { api, getAuthToken, API_BASE } from '../lib/api';
 import { Search, Loader2, CreditCard, Ticket, Printer, RefreshCw, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -80,7 +80,7 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
     setPrintingId(tx.id);
     const token = getAuthToken();
     try {
-      const response = await fetch(`http://localhost:8000/api/transactions/${tx.id}/receipt`, {
+      const response = await fetch(`${API_BASE}/api/transactions/${tx.id}/receipt`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/pdf',
@@ -109,7 +109,7 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
       };
     } catch (err: any) {
       alert(err.message || 'Failed to print receipt. Opening alternative web view...');
-      window.open(`http://localhost:8000/api/transactions/${tx.id}/receipt?token=${token}`, '_blank');
+      window.open(`${API_BASE}/api/transactions/${tx.id}/receipt?token=${token}`, '_blank');
     } finally {
       setPrintingId(null);
     }
@@ -160,9 +160,10 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
+            data-shortcut="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by invoice code, customer name or phone..."
+            placeholder="Search by invoice code, customer name or phone... (Press '/' to focus)"
             className="w-full bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground"
           />
         </div>

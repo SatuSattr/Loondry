@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { api, getAuthToken, setAuthToken, getSavedUser, setSavedUser } from './lib/api';
+import { api, getAuthToken, setAuthToken, getSavedUser, setSavedUser, clearApiCache, API_BASE } from './lib/api';
 import { SlideOver } from './components/SlideOver';
-import { TopProgressBar } from './components/TopProgressBar';
+import NProgress from 'nprogress';
+import 'nprogress/nprogress.css';
+
+NProgress.configure({
+  showSpinner: false,
+  minimum: 0.15,
+  speed: 300,
+});
 import { CustomerForm } from './components/CustomerForm';
 import { ServiceForm } from './components/ServiceForm';
 import { TransactionForm } from './components/TransactionForm';
@@ -49,6 +56,42 @@ export default function App() {
   const [user, setUser] = useState<any>(getSavedUser());
   const [activeTab, setActiveTab] = useState<'dashboard' | 'pos' | 'customers' | 'services' | 'vouchers'>('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  const handleTabChange = async (tab: 'dashboard' | 'pos' | 'customers' | 'services' | 'vouchers') => {
+    if (tab === activeTab || isTransitioning) return;
+    
+    setIsTransitioning(true);
+    NProgress.start();
+    
+    try {
+      switch (tab) {
+        case 'dashboard':
+          await api.getDashboard('all');
+          break;
+        case 'pos':
+          await api.getTransactions();
+          break;
+        case 'customers':
+          await api.getCustomers();
+          break;
+        case 'services':
+          await api.getServices();
+          break;
+        case 'vouchers':
+          await api.getVoucherTemplates();
+          break;
+      }
+      setActiveTab(tab);
+    } catch (err) {
+      console.error('Prefetch failed:', err);
+      // Fallback: switch tab anyway on error
+      setActiveTab(tab);
+    } finally {
+      setIsTransitioning(false);
+      NProgress.done();
+    }
+  };
 
   // Theme state
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -86,6 +129,88 @@ export default function App() {
     window.addEventListener('auth-expired', handleAuthExpired);
     return () => window.removeEventListener('auth-expired', handleAuthExpired);
   }, []);
+
+  // Global keyboard shortcuts for cashiers
+  useEffect(() => {
+    if (!token) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isTyping = activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.getAttribute('contenteditable') === 'true'
+      );
+
+      // Escape -> Close open slideover drawer
+      if (e.key === 'Escape') {
+        if (slideOverType !== null) {
+          e.preventDefault();
+          setSlideOverType(null);
+          setActiveItem(null);
+        }
+      }
+
+      // Ctrl + Enter -> Submit active form
+      if (e.ctrlKey && e.key === 'Enter') {
+        const activeForm = activeEl?.closest('form');
+        if (activeForm) {
+          e.preventDefault();
+          activeForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        }
+      }
+
+      // Non-typing shortcuts
+      if (!isTyping) {
+        // F2 or Alt + N -> Create Transaction
+        if (e.key === 'F2' || (e.altKey && e.key.toLowerCase() === 'n')) {
+          e.preventDefault();
+          setSlideOverType('create-order');
+        }
+
+        // F3 or Alt + C -> Register/Add Customer
+        if (e.key === 'F3' || (e.altKey && e.key.toLowerCase() === 'c')) {
+          e.preventDefault();
+          setSlideOverType('create-customer');
+        }
+
+        // '/' -> Focus search input
+        if (e.key === '/') {
+          const searchInput = document.querySelector('[data-shortcut="search"]') as HTMLInputElement;
+          if (searchInput) {
+            e.preventDefault();
+            searchInput.focus();
+            searchInput.select();
+          }
+        }
+
+        // Alt + 1-5 -> Tab navigation
+        if (e.altKey && e.key === '1') {
+          e.preventDefault();
+          handleTabChange('dashboard');
+        }
+        if (e.altKey && e.key === '2') {
+          e.preventDefault();
+          handleTabChange('pos');
+        }
+        if (e.altKey && e.key === '3') {
+          e.preventDefault();
+          handleTabChange('customers');
+        }
+        if (e.altKey && e.key === '4') {
+          e.preventDefault();
+          handleTabChange('services');
+        }
+        if (e.altKey && e.key === '5') {
+          e.preventDefault();
+          handleTabChange('vouchers');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [token, slideOverType, activeTab, isTransitioning]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -244,7 +369,7 @@ export default function App() {
         <div className="w-full max-w-md bg-card border border-border text-foreground shadow-2xl rounded-2xl p-8 z-10 transition-colors duration-300">
           <div className="text-center space-y-2 mb-8">
             <img 
-              src={isDarkMode ? "http://localhost:8000/storage/assets/loondry-logo-brand-white.png" : "http://localhost:8000/storage/assets/loondry-logo-brand-colored.png"} 
+              src={isDarkMode ? `${API_BASE}/storage/assets/loondry-logo-brand-white.png` : `${API_BASE}/storage/assets/loondry-logo-brand-colored.png`} 
               alt="Loondry Logo" 
               className="h-14 mx-auto mb-4 object-contain"
             />
@@ -305,7 +430,6 @@ export default function App() {
   // Dashboard Layout
   return (
     <div className="h-screen overflow-hidden bg-background text-foreground flex transition-colors duration-300">
-      <TopProgressBar trigger={activeTab} />
       {/* Left Sidebar Navigation */}
       <aside className={`relative bg-card border-r border-border flex flex-col justify-between hidden md:flex shrink-0 ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
         {/* Floating Toggle Button on Right Border */}
@@ -325,8 +449,8 @@ export default function App() {
         <div className="p-4 border-b border-border flex items-center justify-center shrink-0">
           <img 
             src={isSidebarCollapsed 
-              ? (isDarkMode ? "http://localhost:8000/storage/assets/loondry-logo-white.png" : "http://localhost:8000/storage/assets/loondry-logo-colored.png")
-              : (isDarkMode ? "http://localhost:8000/storage/assets/loondry-logo-brand-white.png" : "http://localhost:8000/storage/assets/loondry-logo-brand-colored.png")
+              ? (isDarkMode ? `${API_BASE}/storage/assets/loondry-logo-white.png` : `${API_BASE}/storage/assets/loondry-logo-colored.png`)
+              : (isDarkMode ? `${API_BASE}/storage/assets/loondry-logo-brand-white.png` : `${API_BASE}/storage/assets/loondry-logo-brand-colored.png`)
             } 
             alt="Loondry Logo" 
             className={isSidebarCollapsed ? "h-8 w-8 object-contain" : "h-10 object-contain"}
@@ -336,7 +460,7 @@ export default function App() {
         {/* Navigation Links */}
         <nav className="flex-1 px-4 py-6 space-y-1.5">
           <button
-            onClick={() => setActiveTab('dashboard')}
+            onClick={() => handleTabChange('dashboard')}
             className={`w-full flex items-center rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
               isSidebarCollapsed ? 'justify-center p-2.5' : 'space-x-3 px-3 py-2.5'
             } ${
@@ -351,7 +475,7 @@ export default function App() {
           </button>
 
           <button
-            onClick={() => setActiveTab('pos')}
+            onClick={() => handleTabChange('pos')}
             className={`w-full flex items-center rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
               isSidebarCollapsed ? 'justify-center p-2.5' : 'space-x-3 px-3 py-2.5'
             } ${
@@ -366,7 +490,7 @@ export default function App() {
           </button>
 
           <button
-            onClick={() => setActiveTab('customers')}
+            onClick={() => handleTabChange('customers')}
             className={`w-full flex items-center rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
               isSidebarCollapsed ? 'justify-center p-2.5' : 'space-x-3 px-3 py-2.5'
             } ${
@@ -381,7 +505,7 @@ export default function App() {
           </button>
 
           <button
-            onClick={() => setActiveTab('services')}
+            onClick={() => handleTabChange('services')}
             className={`w-full flex items-center rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
               isSidebarCollapsed ? 'justify-center p-2.5' : 'space-x-3 px-3 py-2.5'
             } ${
@@ -396,7 +520,7 @@ export default function App() {
           </button>
 
           <button
-            onClick={() => setActiveTab('vouchers')}
+            onClick={() => handleTabChange('vouchers')}
             className={`w-full flex items-center rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
               isSidebarCollapsed ? 'justify-center p-2.5' : 'space-x-3 px-3 py-2.5'
             } ${
@@ -482,7 +606,7 @@ export default function App() {
         <header className="md:hidden bg-card border-b border-border p-4 flex justify-between items-center shrink-0">
           <div className="flex items-center">
             <img 
-              src={isDarkMode ? "http://localhost:8000/storage/assets/loondry-logo-brand-white.png" : "http://localhost:8000/storage/assets/loondry-logo-brand-colored.png"} 
+              src={isDarkMode ? `${API_BASE}/storage/assets/loondry-logo-brand-white.png` : `${API_BASE}/storage/assets/loondry-logo-brand-colored.png`} 
               alt="Loondry Logo" 
               className="h-8 object-contain"
             />
@@ -506,7 +630,7 @@ export default function App() {
         {/* Mobile Nav Tabs */}
         <nav className="md:hidden bg-card border-b border-border px-1 py-1 flex space-x-0.5 justify-around text-[10px] shrink-0 overflow-x-auto">
           <button
-            onClick={() => setActiveTab('dashboard')}
+            onClick={() => handleTabChange('dashboard')}
             className={`flex flex-col items-center py-1.5 px-2.5 rounded-lg font-medium cursor-pointer shrink-0 ${
               activeTab === 'dashboard' ? 'text-primary bg-primary/5 font-bold' : 'text-muted-foreground'
             }`}
@@ -515,7 +639,7 @@ export default function App() {
             Dashboard
           </button>
           <button
-            onClick={() => setActiveTab('pos')}
+            onClick={() => handleTabChange('pos')}
             className={`flex flex-col items-center py-1.5 px-2.5 rounded-lg font-medium cursor-pointer shrink-0 ${
               activeTab === 'pos' ? 'text-primary bg-primary/5 font-bold' : 'text-muted-foreground'
             }`}
@@ -524,7 +648,7 @@ export default function App() {
             Orders
           </button>
           <button
-            onClick={() => setActiveTab('customers')}
+            onClick={() => handleTabChange('customers')}
             className={`flex flex-col items-center py-1.5 px-2.5 rounded-lg font-medium cursor-pointer shrink-0 ${
               activeTab === 'customers' ? 'text-primary bg-primary/5 font-bold' : 'text-muted-foreground'
             }`}
@@ -533,7 +657,7 @@ export default function App() {
             Customers
           </button>
           <button
-            onClick={() => setActiveTab('services')}
+            onClick={() => handleTabChange('services')}
             className={`flex flex-col items-center py-1.5 px-2.5 rounded-lg font-medium cursor-pointer shrink-0 ${
               activeTab === 'services' ? 'text-primary bg-primary/5 font-bold' : 'text-muted-foreground'
             }`}
@@ -542,7 +666,7 @@ export default function App() {
             Services
           </button>
           <button
-            onClick={() => setActiveTab('vouchers')}
+            onClick={() => handleTabChange('vouchers')}
             className={`flex flex-col items-center py-1.5 px-2.5 rounded-lg font-medium cursor-pointer shrink-0 ${
               activeTab === 'vouchers' ? 'text-primary bg-primary/5 font-bold' : 'text-muted-foreground'
             }`}

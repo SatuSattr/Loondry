@@ -183,12 +183,13 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
+            data-shortcut="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={
               activeSubTab === 'templates'
-                ? 'Search templates by code or name...'
-                : 'Search redemptions by customer name or code...'
+                ? "Search templates by code or name... (Press '/' to focus)"
+                : "Search redemptions by customer name or code... (Press '/' to focus)"
             }
             className="w-full bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground"
           />
