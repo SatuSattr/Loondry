@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { api, getAuthToken, setAuthToken, getSavedUser, setSavedUser, clearApiCache, API_BASE } from './lib/api';
+import { api, getAuthToken, setAuthToken, getSavedUser, setSavedUser } from './lib/api';
 import { SlideOver } from './components/SlideOver';
 import NProgress from 'nprogress';
 import 'nprogress/nprogress.css';
