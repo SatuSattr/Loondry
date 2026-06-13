@@ -74,6 +74,7 @@ class CustomerController extends Controller
         return response()->json([
             'message' => 'Customer created successfully and credentials sent to email.',
             'data' => $customer->load('user'),
+            'debug_password' => $passwordToUse,
         ], 201);
     }
 

@@ -212,6 +212,23 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [token, slideOverType, activeTab, isTransitioning]);
 
+  // Dynamic Document Title
+  useEffect(() => {
+    const tabTitles: Record<string, string> = {
+      dashboard: 'Dashboard Overview | Loondry Admin',
+      pos: 'POS Billing & Transactions | Loondry Admin',
+      customers: 'Customer Loyalty Database | Loondry Admin',
+      services: 'Laundry Service Catalog | Loondry Admin',
+      vouchers: 'Vouchers & Loyalty Rewards | Loondry Admin',
+    };
+    
+    if (token) {
+      document.title = tabTitles[activeTab] || 'Loondry Admin Portal';
+    } else {
+      document.title = 'Sign In | Loondry POS Portal';
+    }
+  }, [activeTab, token]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginLoading(true);
@@ -369,7 +386,7 @@ export default function App() {
         <div className="w-full max-w-md bg-card border border-border text-foreground shadow-2xl rounded-2xl p-8 z-10 transition-colors duration-300">
           <div className="text-center space-y-2 mb-8">
             <img 
-              src={isDarkMode ? `${API_BASE}/storage/assets/loondry-logo-brand-white.png` : `${API_BASE}/storage/assets/loondry-logo-brand-colored.png`} 
+              src={isDarkMode ? "/assets/loondry-logo-brand-white.png" : "/assets/loondry-logo-brand-colored.png"} 
               alt="Loondry Logo" 
               className="h-14 mx-auto mb-4 object-contain"
             />
@@ -449,8 +466,8 @@ export default function App() {
         <div className="p-4 border-b border-border flex items-center justify-center shrink-0">
           <img 
             src={isSidebarCollapsed 
-              ? (isDarkMode ? `${API_BASE}/storage/assets/loondry-logo-white.png` : `${API_BASE}/storage/assets/loondry-logo-colored.png`)
-              : (isDarkMode ? `${API_BASE}/storage/assets/loondry-logo-brand-white.png` : `${API_BASE}/storage/assets/loondry-logo-brand-colored.png`)
+              ? (isDarkMode ? "/assets/loondry-logo-white.png" : "/assets/loondry-logo-colored.png")
+              : (isDarkMode ? "/assets/loondry-logo-brand-white.png" : "/assets/loondry-logo-brand-colored.png")
             } 
             alt="Loondry Logo" 
             className={isSidebarCollapsed ? "h-8 w-8 object-contain" : "h-10 object-contain"}
@@ -606,7 +623,7 @@ export default function App() {
         <header className="md:hidden bg-card border-b border-border p-4 flex justify-between items-center shrink-0">
           <div className="flex items-center">
             <img 
-              src={isDarkMode ? `${API_BASE}/storage/assets/loondry-logo-brand-white.png` : `${API_BASE}/storage/assets/loondry-logo-brand-colored.png`} 
+              src={isDarkMode ? "/assets/loondry-logo-brand-white.png" : "/assets/loondry-logo-brand-colored.png"} 
               alt="Loondry Logo" 
               className="h-8 object-contain"
             />
