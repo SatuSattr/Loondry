@@ -20,7 +20,7 @@ return new class extends Migration
             $table->decimal('weight', 8, 2); // Required for calculation and Mobile detail
             $table->decimal('total_price', 12, 2); // Decimal (12,2)
             $table->enum('status', ['antrian', 'dicuci', 'disetrika', 'siap diambil', 'diambil'])->default('antrian'); // Enum
-            $table->enum('payment_method', ['cash', 'transfer']); // Enum
+            $table->enum('payment_method', ['cash', 'transfer', 'qris']); // Enum
             $table->enum('payment_status', ['pending', 'paid'])->default('pending'); // Enum
             $table->string('payment_proof', 255)->nullable(); // Varchar (255)
             $table->timestamp('paid_at')->nullable(); // Timestamp

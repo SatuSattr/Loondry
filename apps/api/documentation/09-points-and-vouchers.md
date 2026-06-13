@@ -11,7 +11,10 @@ Loyalty system: earn points on paid transactions, redeem points for discount vou
 | `points.redeem_rate` | 100 | Points needed per 1 IDR discount |
 | `points.voucher_prefix` | VCH | Prefix for generated voucher codes |
 
-Example: Transaction of **Rp 40.000** earns **40 points**. Redeeming **100 points** gives a voucher worth **Rp 1**.
+### Points Calculation Guidelines
+1. **Discount Impact**: Points are calculated from the **actual paid amount** after applying voucher discounts (i.e. `points_earned = floor((total_price - discount) / 1000) * 1`).
+2. **Timing of Award**: Points are **only** added to the customer's account balance once the transaction status transitions to `paid`.
+3. **Example**: Transaction subtotal is **Rp 50.000**. A voucher discount of **Rp 10.000** is applied, making the actual paid amount **Rp 40.000**. The customer earns **40 points** (calculated on Rp 40.000). If payment is marked as `pending` (Bayar Nanti), these 40 points will only be awarded once the payment is completed.
 
 ---
 
@@ -59,6 +62,10 @@ Redeem customer's loyalty points for a voucher from the catalog.
 ```
 *Note: `customer_id` is optional. If provided, the admin/operator is redeeming on behalf of that customer, deducting points from that customer's user account.*
 
+### Voucher Code Bind & Validity Rules
+1. **User Binding**: Every redeemed voucher code is bound to the redeemer's user ID. Code format is: `{VOUCHER_CODE}-{USER_ID}-{RANDOM_STRING}` (e.g. `SALE90-2-X1Y2Z3`). Only the customer with the matching user ID can use this voucher code.
+2. **3-Day Expiry**: Redeemed vouchers have a strict **3-day expiry limit** (`expires_at` is set to exactly 3 days from the time of redemption). Once expired, the code is invalid.
+
 **Response `201`:**
 
 ```json
@@ -68,10 +75,11 @@ Redeem customer's loyalty points for a voucher from the catalog.
         "id": 1,
         "user_id": 2,
         "voucher_id": 1,
-        "voucher_code": "SALE90-ABCXYZ",
+        "voucher_code": "SALE90-2-X1Y2Z3",
         "points_spent": 50,
         "discount_value": 90.00,
         "is_used": false,
+        "expires_at": "2026-06-16T19:50:00.000000Z",
         "voucher": {
             "id": 1,
             "code": "SALE90",
@@ -133,6 +141,41 @@ List customer's **unused** vouchers only.
 
 ---
 
+### `GET /api/vouchers/check/{voucher_code}`
+
+Check if a redeemed voucher code is valid for use, verify user ownership, expiration, minimum transaction rules, and calculate the discount value.
+
+**Auth:** Sanctum (any role)
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `total_price` | numeric | yes | The transaction total price (minimum transaction limits are checked against this). |
+| `customer_id` | integer | yes | The customer ID who is trying to redeem the voucher. |
+
+**Response `200` (Voucher is valid):**
+
+```json
+{
+    "valid": true,
+    "discount": 18000,
+    "voucher_code": "SALE90-2-X1Y2Z3",
+    "name": "SALE90 - 90% Off s.d Rp 30k"
+}
+```
+
+**Response `422` (Voucher is invalid/mismatch/expired):**
+
+```json
+{
+    "valid": false,
+    "message": "Voucher ini milik customer lain."
+}
+```
+
+---
+
 ### `POST /api/transactions/{transaction}/apply-voucher`
 
 Apply a redeemed voucher code to a transaction in the POS. Discount is dynamically calculated and deducted from `total_price`. Marks the coupon code as `is_used = true`.
@@ -171,10 +214,11 @@ Apply a redeemed voucher code to a transaction in the POS. Discount is dynamical
 
 | Code | Condition |
 |------|-----------|
-| 400 | `Voucher has expired` or `Voucher is not valid yet` |
-| 400 | `Minimum transaction required to use this voucher is Rp X` |
-| 403 | `Voucher belongs to another customer` |
-| 404 | `Voucher not found or already used` |
+| 400 | `Voucher belum dapat digunakan` or `Voucher sudah kedaluwarsa` (template validation) |
+| 400 | `Minimal transaksi untuk voucher ini adalah Rp X` |
+| 400 | `Voucher ini milik customer lain.` (user ID mismatch) |
+| 400 | `Voucher sudah kedaluwarsa (masa aktif 3 hari habis).` |
+| 400 | `Voucher tidak ditemukan atau sudah digunakan.` |
 
 ---
 
@@ -254,10 +298,11 @@ Delete a template.
 
 ## How Points Earned
 
-1. Admin creates transaction via `POST /api/transactions`
-2. System calculates `points_earned = floor(total_price / 1000) * 1`
-3. When customer uploads payment proof via `POST /api/transactions/{id}/payment`, points are added to customer's user account
-4. Points appear in customer's `GET /api/points` response and admin dashboard
+1. System calculates `points_earned = floor((total_price - discount) / 1000) * 1`. Points are only earned on the actual paid amount after applying any voucher discounts.
+2. Points are **only** awarded to the customer's user account once the transaction payment status becomes `paid`.
+3. If the transaction is paid immediately during creation, points are awarded immediately.
+4. If the transaction has `payment_status = pending` (Bayar Nanti), points are not awarded immediately. They will be awarded once the payment/pelunasan is completed via `POST /api/transactions/{id}/payment` (or when confirmed as paid).
+5. Points balance and redemption history can be verified via `GET /api/points`.
 
 ## Receipt PDF
 

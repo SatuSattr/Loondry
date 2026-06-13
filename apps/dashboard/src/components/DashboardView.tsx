@@ -213,8 +213,8 @@ export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer }: Dashb
 
         {/* Total Laundry Masuk */}
         <StatisticsCard
-          title="Total Laundry Masuk"
-          value={`${summary?.total_laundry_masuk || 0} Transactions`}
+          title="Total Transactions"
+          value={`${summary?.total_laundry_masuk || 0}`}
           status="unknown"
           range="All Transactions"
         />
@@ -222,7 +222,7 @@ export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer }: Dashb
         {/* Active Orders */}
         <StatisticsCard
           title="Active Orders"
-          value={`${summary?.active_orders || 0} Orders`}
+          value={`${summary?.active_orders || 0}`}
           status="observe"
           range="In Queue & Washing"
         />
@@ -230,7 +230,7 @@ export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer }: Dashb
         {/* Total Customers */}
         <StatisticsCard
           title="Total Customers"
-          value={`${summary?.total_customers || 0} Customers`}
+          value={`${summary?.total_customers || 0}`}
           status="within"
           range="Registered Customers"
         />
@@ -370,7 +370,7 @@ export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer }: Dashb
 
           <div className="bg-muted border border-border p-3.5 rounded-lg text-xs mt-4">
             <span className="font-semibold text-foreground block mb-0.5">Quick Guide:</span>
-            Customers earn 1 pt per Rp 1.000 spent. Points can be redeemed for discounts (1 pt = Rp 0.01 / 100 pt = Rp 1).
+            Customers earn 1 pt per Rp 1.000 spent. Points can be redeemed for discounts vouchers.
           </div>
         </div>
       </div>

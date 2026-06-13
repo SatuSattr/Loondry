@@ -18,10 +18,13 @@ Base path: `/api`
 | `weight` | decimal(8,2) | Required, >= 0.1 |
 | `total_price` | decimal(12,2) | Auto-calculated: `service.price * weight` |
 | `status` | enum | `antrian`, `dicuci`, `disetrika`, `siap diambil`, `diambil` (default: `antrian`) |
-| `payment_method` | enum | `cash` or `transfer` |
+| `payment_method` | enum | `cash`, `transfer`, or `qris` |
 | `payment_status` | enum | `pending` or `paid` (default: `pending`) |
 | `payment_proof` | varchar(255) | Nullable, stores file path |
 | `paid_at` | timestamp | Nullable |
+| `points_earned` | integer | Number of points earned for the transaction |
+| `discount` | decimal(12,2)| Discount amount applied |
+| `voucher_code` | varchar(255) | Nullable, applied voucher code |
 
 ### Related Tables
 
@@ -64,11 +67,17 @@ POST /api/transactions
 | `customer_id` | integer | yes | Must reference an existing customer |
 | `service_id` | integer | yes | Must reference an existing service |
 | `weight` | number | yes | Minimum 0.1 |
-| `payment_method` | string | yes | Must be `cash` or `transfer` |
+| `payment_method` | string | yes | Must be `cash`, `transfer`, or `qris` |
+| `payment_status` | string | yes | Must be `pending` or `paid` |
+| `payment_proof` | file | no | Proof image required if `payment_status` is `paid` and method is `transfer` or `qris` |
+| `voucher_code` | string | no | Redeemed voucher code to apply discount (only allowed when `payment_status` is `paid`) |
 
 **Invoice code format:** `LND-NNN` (auto-generated, sequential, e.g. `LND-001`, `LND-002`)
 
 **Total price:** `service.price * weight` (auto-calculated)
+
+> [!IMPORTANT]
+> Voucher code **cannot** be applied during creation if the `payment_status` is `pending` (returns `422`). Vouchers must be applied during payment/pelunasan (`POST /api/transactions/{id}/payment`).
 
 ### Example
 
@@ -77,7 +86,9 @@ POST /api/transactions
   "customer_id": 1,
   "service_id": 1,
   "weight": 2.5,
-  "payment_method": "cash"
+  "payment_method": "qris",
+  "payment_status": "paid",
+  "voucher_code": "SALE90-2-X1Y2Z3"
 }
 ```
 
@@ -88,15 +99,18 @@ POST /api/transactions
   "message": "Transaction created successfully",
   "data": {
     "id": 1,
-    "invoice_code": "LND-20260607-001",
+    "invoice_code": "LND-001",
     "admin_id": 1,
     "customer_id": 1,
     "service_id": 1,
     "weight": "2.50",
     "total_price": "20000.00",
     "status": "antrian",
-    "payment_method": "cash",
-    "payment_status": "pending",
+    "payment_method": "qris",
+    "payment_status": "paid",
+    "points_earned": 20,
+    "discount": "0.00",
+    "voucher_code": null,
     "created_at": "2026-06-07T17:06:04.000000Z",
     "updated_at": "2026-06-07T17:06:04.000000Z",
     "customer": {
@@ -286,6 +300,11 @@ PUT /api/transactions/{transaction}/status
 }
 ```
 
+> [!IMPORTANT]
+> **Status Transition Rules:**
+> 1. Transaksi yang sudah selesai (`status` = `diambil`) tidak dapat diubah statusnya lagi (returns `422`).
+> 2. Transaksi tidak dapat diubah ke status `diambil` jika pembayaran masih tertunda (`payment_status` = `pending`) (returns `422`).
+> 
 > A new `transaction_logs` entry is created on each status change. If the new status equals the current status, no change is made.
 
 ---
@@ -343,18 +362,22 @@ POST /api/transactions/{transaction}/payment
 
 | Field | Type | Required | Validation |
 |-------|------|----------|------------|
-| `payment_proof` | file | yes | Image (jpg, jpeg, png), max 2MB (2048 KB) |
+| `payment_proof` | file | yes | Image (jpg, jpeg, png), max 2MB (2048 KB). Optional/nullable only if `payment_method` is `cash`. |
+| `voucher_code` | string | no | Redeemed voucher code to apply discount during payment pelunasan. |
 
 ### Response `200 OK`
 
 ```json
 {
-  "message": "Payment proof uploaded and receipt sent to email successfully",
+  "message": "Payment proof uploaded, points awarded, and receipt sent to email successfully",
   "data": {
     "id": 1,
-    "invoice_code": "LND-20260607-001",
+    "invoice_code": "LND-001",
     "payment_proof": "payment_proofs/abc123.jpg",
     "payment_status": "paid",
+    "points_earned": 20,
+    "discount": "0.00",
+    "voucher_code": null,
     "paid_at": "2026-06-07T17:07:15.000000Z",
     "updated_at": "2026-06-07T17:07:15.000000Z",
     "customer": { ... },
@@ -365,11 +388,13 @@ POST /api/transactions/{transaction}/payment
 ```
 
 > When payment is uploaded:
-> 1. `payment_proof` is stored to `storage/app/public/payment_proofs/`
-> 2. `payment_status` is set to `paid`
-> 3. `paid_at` is set to current timestamp
-> 4. A PDF receipt is generated and sent via `TransactionReceiptMail` to the customer's email
-> 5. If a previous payment proof exists, it is deleted
+> 1. `payment_proof` is stored to `storage/app/public/payment_proofs/` (if uploaded).
+> 2. `payment_status` is set to `paid`.
+> 3. `paid_at` is set to current timestamp.
+> 4. If `voucher_code` is provided and valid, discount is calculated and applied to the transaction. If the transaction has already applied a voucher, returns `422`.
+> 5. Points are recalculated based on the actual paid amount after discount and awarded to the customer's user account.
+> 6. A PDF receipt is generated and sent via `TransactionReceiptMail` to the customer's email.
+> 7. If a previous payment proof exists, it is deleted.
 
 ---
 

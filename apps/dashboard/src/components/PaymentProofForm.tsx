@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { api } from '../lib/api';
-import { Loader2, UploadCloud } from 'lucide-react';
+import { Loader2, UploadCloud, Ticket } from 'lucide-react';
 
 interface PaymentProofFormProps {
   transaction: any;
@@ -15,6 +15,13 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
 
+  // Voucher states
+  const [voucherCode, setVoucherCode] = useState('');
+  const [appliedVoucher, setAppliedVoucher] = useState<{ code: string; discount: number; name: string } | null>(null);
+  const [checkingVoucher, setCheckingVoucher] = useState(false);
+  const [voucherError, setVoucherError] = useState('');
+  const [voucherSuccessMsg, setVoucherSuccessMsg] = useState('');
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -23,6 +30,38 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
       // Create local preview
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
+    }
+  };
+
+  const handleApplyVoucher = async () => {
+    if (!voucherCode.trim()) {
+      setVoucherError('Masukkan kode voucher.');
+      return;
+    }
+    setCheckingVoucher(true);
+    setVoucherError('');
+    setVoucherSuccessMsg('');
+    setAppliedVoucher(null);
+    try {
+      const res = await api.checkVoucherCode(
+        voucherCode.trim(),
+        Number(transaction?.total_price || 0),
+        transaction?.customer_id
+      );
+      if (res.valid) {
+        setAppliedVoucher({
+          code: voucherCode.trim(),
+          discount: Number(res.discount),
+          name: res.name
+        });
+        setVoucherSuccessMsg(`Voucher berhasil digunakan! Diskon: Rp ${Number(res.discount).toLocaleString()}`);
+      } else {
+        setVoucherError(res.message || 'Voucher tidak valid.');
+      }
+    } catch (err: any) {
+      setVoucherError(err.message || 'Voucher tidak valid atau sudah kedaluwarsa.');
+    } finally {
+      setCheckingVoucher(false);
     }
   };
 
@@ -37,7 +76,7 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
     setError('');
 
     try {
-      await api.uploadPaymentProof(transaction.id, selectedFile);
+      await api.uploadPaymentProof(transaction.id, selectedFile, appliedVoucher?.code);
       onSubmitSuccess();
     } catch (err: any) {
       setError(err.message || 'Failed to upload payment proof');
@@ -45,6 +84,9 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
       setUploading(false);
     }
   };
+
+  const currentDiscount = Number(transaction?.discount || 0) + (appliedVoucher ? appliedVoucher.discount : 0);
+  const amountDue = Math.max(0, Number(transaction?.total_price || 0) - currentDiscount);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
@@ -69,18 +111,61 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
           <span className="text-muted-foreground">Service</span>
           <span className="font-medium">{transaction?.service?.service_name}</span>
         </div>
+        {currentDiscount > 0 && (
+          <div className="flex justify-between text-emerald-500 font-semibold">
+            <span>Diskon Voucher</span>
+            <span>-Rp {currentDiscount.toLocaleString()}</span>
+          </div>
+        )}
         <div className="flex justify-between border-t border-border pt-2 text-base font-bold text-foreground">
           <span>Amount Due</span>
-          <span>Rp {(Number(transaction?.total_price) - Number(transaction?.discount || 0)).toLocaleString()}</span>
+          <span>Rp {amountDue.toLocaleString()}</span>
         </div>
       </div>
+
+      {/* Voucher Code Input (Only if the transaction doesn't have a voucher applied already) */}
+      {!transaction?.voucher_code && (
+        <div className="space-y-2 p-3 bg-muted/40 border border-border rounded-lg">
+          <div className="flex items-center space-x-1.5 text-xs font-semibold text-foreground">
+            <Ticket className="h-3.5 w-3.5 text-primary" />
+            <span>Gunakan Voucher Belanja (Opsional)</span>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <input
+              type="text"
+              placeholder="Masukkan kode voucher customer..."
+              value={voucherCode}
+              onChange={(e) => setVoucherCode(e.target.value)}
+              className="flex-1 bg-background border border-border rounded-lg px-2.5 py-1.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground uppercase"
+            />
+            <button
+              type="button"
+              onClick={handleApplyVoucher}
+              disabled={checkingVoucher || !voucherCode.trim()}
+              className="bg-primary text-primary-foreground hover:bg-primary/95 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+            >
+              {checkingVoucher ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                'Terapkan'
+              )}
+            </button>
+          </div>
+          {voucherError && (
+            <p className="text-[11px] text-destructive pt-0.5 pl-0.5 font-medium">{voucherError}</p>
+          )}
+          {voucherSuccessMsg && (
+            <p className="text-[11px] text-emerald-500 pt-0.5 pl-0.5 font-medium">{voucherSuccessMsg}</p>
+          )}
+        </div>
+      )}
 
       {/* Upload Box */}
       {transaction?.payment_method === 'cash' ? (
         <div className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-lg p-4 text-xs space-y-2">
-          <p className="font-semibold text-sm">Pembayaran Tunai (Cash)</p>
+          <p className="font-semibold text-sm">Pembayaran Cash</p>
           <p className="text-muted-foreground text-[11px] leading-relaxed">
-            Metode pembayaran transaksi ini adalah <strong>Cash</strong>. Anda tidak perlu mengunggah foto bukti pembayaran. Cukup klik tombol <strong>Confirm & Pay</strong> di bawah untuk memproses dan mengaktifkan poin loyalitas pelanggan.
+            Metode pembayaran transaksi ini adalah <strong>Cash</strong>. Anda tidak perlu mengunggah foto bukti pembayaran.
           </p>
         </div>
       ) : (

@@ -59,13 +59,12 @@ User (1) ──── hasOne ──── Customer (1)
 
 ## Invoice Code
 
-Format: `LND-YYYYMMDD-NNN`
+Format: `LND-NNN`
 
 - `LND` — Prefix (Loondry)
-- `YYYYMMDD` — Date of creation
 - `NNN` — Zero-padded sequential ID (001, 002, ...)
 
-Example: `LND-20260607-001`
+Example: `LND-001`
 
 ---
 

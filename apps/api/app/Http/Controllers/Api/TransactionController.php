@@ -9,6 +9,7 @@ use App\Models\Service;
 use App\Models\Transaction;
 use App\Models\TransactionLog;
 use App\Models\TransactionImage;
+use App\Models\PointsRedemption;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as DomPDF;
 use Illuminate\Http\Request;
@@ -36,21 +37,51 @@ class TransactionController extends Controller
     {
         $service = Service::findOrFail($request->service_id);
         $raw_total = $service->price * $request->weight;
-        $points_earned = intdiv($raw_total, config('points.earn_per')) * config('points.earn_rate');
+
+        $paymentStatus = $request->input('payment_status', 'pending');
+        if ($paymentStatus !== 'paid') {
+            $paymentStatus = 'pending';
+        }
+
+        // Apply voucher if provided
+        $discount = 0;
+        $redemption = null;
+        if ($request->filled('voucher_code')) {
+            if ($paymentStatus === 'pending') {
+                return response()->json([
+                    'message' => 'Voucher tidak dapat digunakan pada pembuatan transaksi dengan metode pembayaran tunda (Bayar Nanti). Silakan gunakan voucher saat melakukan pelunasan pembayaran.'
+                ], 422);
+            }
+
+            try {
+                $result = PointsRedemption::validateAndCalculateDiscount(
+                    $request->voucher_code,
+                    $raw_total,
+                    $request->customer_id
+                );
+                $redemption = $result['redemption'];
+                $discount = $result['discount'];
+            } catch (\Exception $e) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+        }
+
+        $actual_paid = max(0, $raw_total - $discount);
+        $points_earned = intdiv($actual_paid, config('points.earn_per')) * config('points.earn_rate');
 
         // Generate invoice code: LND-NNN (sequential, e.g. LND-001)
         $maxId = Transaction::max('id') ?: 0;
         $id = $maxId + 1;
         $invoice_code = 'LND-' . str_pad($id, 3, '0', STR_PAD_LEFT);
 
-        $transaction = DB::transaction(function () use ($request, $invoice_code, $raw_total, $points_earned) {
+        $transaction = DB::transaction(function () use ($request, $invoice_code, $raw_total, $points_earned, $discount, $redemption) {
             $paymentStatus = $request->input('payment_status', 'pending');
             $paidAt = null;
             $proofPath = null;
 
             if ($paymentStatus === 'paid') {
                 $paidAt = now();
-                if ($request->payment_method === 'transfer' && $request->hasFile('payment_proof')) {
+                if (in_array($request->payment_method, ['transfer', 'qris']) && $request->hasFile('payment_proof')) {
                     $proofPath = $request->file('payment_proof')->store('payment_proofs', 'public');
                 }
             } else {
@@ -70,7 +101,16 @@ class TransactionController extends Controller
                 'payment_proof' => $proofPath,
                 'paid_at' => $paidAt,
                 'points_earned' => $points_earned,
+                'discount' => $discount,
+                'voucher_code' => $redemption ? $redemption->voucher_code : null,
             ]);
+
+            if ($redemption) {
+                $redemption->update([
+                    'is_used' => true,
+                    'used_at' => now(),
+                ]);
+            }
 
             // If paid, increment points for customer
             if ($paymentStatus === 'paid') {
@@ -182,7 +222,32 @@ class TransactionController extends Controller
             'payment_proof' => $transaction->payment_method === 'cash'
                 ? ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048']
                 : ['required', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
+            'voucher_code' => ['nullable', 'string'],
         ]);
+
+        if ($transaction->voucher_code && $request->filled('voucher_code')) {
+            return response()->json(['message' => 'Transaksi ini sudah menggunakan voucher.'], 422);
+        }
+
+        $discount = $transaction->discount ?: 0;
+        $redemption = null;
+        if ($request->filled('voucher_code')) {
+            try {
+                $result = PointsRedemption::validateAndCalculateDiscount(
+                    $request->voucher_code,
+                    $transaction->total_price,
+                    $transaction->customer_id
+                );
+                $redemption = $result['redemption'];
+                $discount = $result['discount'];
+            } catch (\Exception $e) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+        }
+
+        // Recalculate points earned based on actual paid amount after discount
+        $actual_paid = max(0, $transaction->total_price - $discount);
+        $points_earned = intdiv($actual_paid, config('points.earn_per')) * config('points.earn_rate');
 
         $path = null;
         if ($request->hasFile('payment_proof')) {
@@ -192,18 +257,30 @@ class TransactionController extends Controller
             $path = $request->file('payment_proof')->store('payment_proofs', 'public');
         }
 
-        DB::transaction(function () use ($path, $transaction) {
+        DB::transaction(function () use ($path, $transaction, $discount, $redemption, $points_earned) {
             $updateData = [
                 'payment_status' => 'paid',
                 'paid_at' => now(),
+                'points_earned' => $points_earned,
             ];
             if ($path !== null) {
                 $updateData['payment_proof'] = $path;
             }
+            if ($redemption) {
+                $updateData['discount'] = $discount;
+                $updateData['voucher_code'] = $redemption->voucher_code;
+            }
             $transaction->update($updateData);
 
+            if ($redemption) {
+                $redemption->update([
+                    'is_used' => true,
+                    'used_at' => now(),
+                ]);
+            }
+
             $customerUser = $transaction->customer->user;
-            $customerUser->increment('points', $transaction->points_earned);
+            $customerUser->increment('points', $points_earned);
         });
 
         $transaction->load(['customer.user', 'admin', 'service']);

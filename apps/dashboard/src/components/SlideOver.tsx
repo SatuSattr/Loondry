@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 
 interface SlideOverProps {
@@ -9,21 +9,38 @@ interface SlideOverProps {
 }
 
 export function SlideOver({ isOpen, onClose, title, children }: SlideOverProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+      const focusTimeout = setTimeout(() => {
+        if (panelRef.current) {
+          const focusable = panelRef.current.querySelector(
+            'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])'
+          ) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
+          if (focusable) {
+            focusable.focus();
+            if (focusable.tagName === 'INPUT' && (focusable.type === 'text' || focusable.type === 'number')) {
+              focusable.select();
+            }
+          }
+        }
+      }, 150); // slight delay to ensure drawer DOM is fully rendered
+
+      return () => {
+        clearTimeout(focusTimeout);
+        document.body.style.overflow = 'unset';
+      };
     } else {
       document.body.style.overflow = 'unset';
     }
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
   }, [isOpen]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
+    <div ref={panelRef} className="fixed inset-0 z-50 overflow-hidden">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-xs"

@@ -35,7 +35,7 @@ export function CustomerForm({ customer, onSubmitSuccess, onCancel }: CustomerFo
       setEmail(customer.user?.email || '');
       setPhone(customer.phone || '');
       setAddress(customer.address || '');
-      setBirthDate(customer.user?.birth_date || '');
+      setBirthDate(customer.user?.birth_date ? customer.user.birth_date.substring(0, 10) : '');
       setReligion(customer.user?.religion || '');
       setGender(customer.user?.gender || 'L');
       setPassword('');

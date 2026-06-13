@@ -215,11 +215,11 @@ export default function App() {
   // Dynamic Document Title
   useEffect(() => {
     const tabTitles: Record<string, string> = {
-      dashboard: 'Dashboard Overview | Loondry Admin',
-      pos: 'POS Billing & Transactions | Loondry Admin',
-      customers: 'Customer Loyalty Database | Loondry Admin',
-      services: 'Laundry Service Catalog | Loondry Admin',
-      vouchers: 'Vouchers & Loyalty Rewards | Loondry Admin',
+      dashboard: 'Dashboard | Loondry Admin',
+      pos: 'Transactions | Loondry Admin',
+      customers: 'Customer | Loondry Admin',
+      services: 'Service | Loondry Admin',
+      vouchers: 'Vouchers | Loondry Admin',
     };
     
     if (token) {
@@ -372,8 +372,7 @@ export default function App() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden transition-colors duration-300">
         {/* Soft Background blur gradients */}
-        <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-primary/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-violet-500/10 rounded-full blur-3xl" />
+        <div className="absolute top-50% right-50% h-[500px] w-[500px] blur-[120px] bg-gradient-to-bl from-blue-500/20 via-blue-500/15 to-blue-500/5   pointer-events-none" />
 
         {/* Floating Dark Mode Toggle */}
         <button
@@ -383,7 +382,7 @@ export default function App() {
           {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
         </button>
 
-        <div className="w-full max-w-md bg-card border border-border text-foreground shadow-2xl rounded-2xl p-8 z-10 transition-colors duration-300">
+        <div className="w-full max-w-md bg-card border border-border text-foreground  rounded-2xl p-8 z-10 transition-colors duration-300">
           <div className="text-center space-y-2 mb-8">
             <img 
               src={isDarkMode ? "/assets/loondry-logo-brand-white.png" : "/assets/loondry-logo-brand-colored.png"} 
@@ -446,9 +445,13 @@ export default function App() {
 
   // Dashboard Layout
   return (
-    <div className="h-screen overflow-hidden bg-background text-foreground flex transition-colors duration-300">
+    <div className="relative h-screen overflow-hidden bg-background text-foreground flex transition-colors duration-300">
+
+      {/* Ambient Gradient Blur Circle */}
+      <div className="absolute top-5 -right-5 h-[400px] w-[400px] md:top-[-200px] md:right-[-600px] rotate-45 blur-[120px] md:w-[1000px] md:h-[1000px]  bg-gradient-to-bl from-blue-500/20 via-blue-500/15 to-blue-500/5   pointer-events-none" />
+
       {/* Left Sidebar Navigation */}
-      <aside className={`relative bg-card border-r border-border flex flex-col justify-between hidden md:flex shrink-0 ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
+      <aside className={`relative bg-card border-r border-border flex flex-col z-10 justify-between hidden md:flex shrink-0 ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
         {/* Floating Toggle Button on Right Border */}
         <button
           onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -618,7 +621,7 @@ export default function App() {
       </aside>
 
       {/* Main Panel */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto z-10">
         {/* Mobile Header */}
         <header className="md:hidden bg-card border-b border-border p-4 flex justify-between items-center shrink-0">
           <div className="flex items-center">

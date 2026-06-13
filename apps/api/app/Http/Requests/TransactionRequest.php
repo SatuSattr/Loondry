@@ -25,9 +25,10 @@ class TransactionRequest extends FormRequest
             'customer_id' => ['required', 'exists:customers,id'],
             'service_id' => ['required', 'exists:services,id'],
             'weight' => ['required', 'numeric', 'min:0.1'],
-            'payment_method' => ['required', 'in:cash,transfer'],
+            'payment_method' => ['required', 'in:cash,transfer,qris'],
             'payment_status' => ['required', 'in:pending,paid'],
             'payment_proof' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
+            'voucher_code' => ['nullable', 'string'],
         ];
     }
 }

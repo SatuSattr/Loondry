@@ -36,10 +36,22 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
   const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
   const [conditionFile, setConditionFile] = useState<File | null>(null);
   const [conditionPreview, setConditionPreview] = useState<string | null>(null);
-  const [paymentTiming, setPaymentTiming] = useState<'upfront' | 'pickup'>('upfront');
-  const [customerVouchers, setCustomerVouchers] = useState<any[]>([]);
-  const [selectedVoucher, setSelectedVoucher] = useState<any | null>(null);
-  const [loadingVouchers, setLoadingVouchers] = useState(false);
+
+  const [paymentTiming, setPaymentTimingState] = useState<'upfront' | 'pickup'>(() => {
+    const saved = localStorage.getItem('lnd_payment_timing_pref');
+    return (saved === 'upfront' || saved === 'pickup') ? saved : 'upfront';
+  });
+
+  const setPaymentTiming = (val: 'upfront' | 'pickup') => {
+    setPaymentTimingState(val);
+    localStorage.setItem('lnd_payment_timing_pref', val);
+  };
+
+  const [voucherCode, setVoucherCode] = useState('');
+  const [appliedVoucher, setAppliedVoucher] = useState<{ code: string; discount: number; name: string } | null>(null);
+  const [checkingVoucher, setCheckingVoucher] = useState(false);
+  const [voucherError, setVoucherError] = useState('');
+  const [voucherSuccessMsg, setVoucherSuccessMsg] = useState('');
   
   // Submit state
   const [loading, setLoading] = useState(false);
@@ -65,27 +77,12 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
     loadServices();
   }, []);
 
-  // Fetch customer vouchers when selectedCustomer changes
+  // Clear voucher application if customer, service, or weight changes
   useEffect(() => {
-    if (!selectedCustomer) {
-      setCustomerVouchers([]);
-      setSelectedVoucher(null);
-      return;
-    }
-
-    async function loadCustomerVouchers() {
-      setLoadingVouchers(true);
-      try {
-        const res = await api.getCustomerVouchers(selectedCustomer.user?.id);
-        setCustomerVouchers(res.data || []);
-      } catch (err) {
-        console.error('Failed to load customer vouchers', err);
-      } finally {
-        setLoadingVouchers(false);
-      }
-    }
-    loadCustomerVouchers();
-  }, [selectedCustomer]);
+    setAppliedVoucher(null);
+    setVoucherSuccessMsg('');
+    setVoucherError('');
+  }, [selectedCustomer, selectedService, weight]);
 
   // Handle customer search query
   useEffect(() => {
@@ -126,28 +123,45 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
   const numericWeight = Number(weight) || 0;
   const subtotal = price * numericWeight;
 
-  // Calculate discount from selectedVoucher
-  let discount = 0;
-  if (selectedVoucher && selectedVoucher.voucher) {
-    const voucherInfo = selectedVoucher.voucher;
-    if (voucherInfo.discount_type === 'percentage') {
-      discount = subtotal * (Number(voucherInfo.discount_value) / 100);
-      if (voucherInfo.max_discount && discount > Number(voucherInfo.max_discount)) {
-        discount = Number(voucherInfo.max_discount);
-      }
-    } else {
-      discount = Number(voucherInfo.discount_value);
-    }
-  } else if (selectedVoucher) {
-    discount = Number(selectedVoucher.discount_value);
-  }
-  if (discount > subtotal) {
-    discount = subtotal;
-  }
-  const finalTotal = subtotal - discount;
+  // Calculate discount from appliedVoucher
+  const discount = appliedVoucher ? appliedVoucher.discount : 0;
+  const finalTotal = Math.max(0, subtotal - discount);
 
-  // Points configuration: 1 point per 1000 IDR
-  const pointsEarned = Math.floor(subtotal / 1000);
+
+  // Points configuration: 1 point per 1000 IDR of paid amount
+  const pointsEarned = Math.floor(finalTotal / 1000);
+
+  const handleApplyVoucher = async () => {
+    if (!selectedCustomer) {
+      setVoucherError('Silakan pilih customer terlebih dahulu.');
+      return;
+    }
+    if (!voucherCode.trim()) {
+      setVoucherError('Masukkan kode voucher.');
+      return;
+    }
+    setCheckingVoucher(true);
+    setVoucherError('');
+    setVoucherSuccessMsg('');
+    setAppliedVoucher(null);
+    try {
+      const res = await api.checkVoucherCode(voucherCode.trim(), subtotal, selectedCustomer.id);
+      if (res.valid) {
+        setAppliedVoucher({
+          code: voucherCode.trim(),
+          discount: Number(res.discount),
+          name: res.name
+        });
+        setVoucherSuccessMsg(`Voucher berhasil digunakan! Diskon: Rp ${Number(res.discount).toLocaleString()}`);
+      } else {
+        setVoucherError(res.message || 'Voucher tidak valid.');
+      }
+    } catch (err: any) {
+      setVoucherError(err.message || 'Voucher tidak valid atau sudah kedaluwarsa.');
+    } finally {
+      setCheckingVoucher(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,8 +177,8 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
       setError('Weight/Quantity must be greater than 0');
       return;
     }
-    if (paymentTiming === 'upfront' && paymentMethod === 'transfer' && !paymentProofFile) {
-      setError('Please upload the payment proof for transfer payments');
+    if (paymentTiming === 'upfront' && ['transfer', 'qris'].includes(paymentMethod) && !paymentProofFile) {
+      setError('Please upload the payment proof for transfer/qris payments');
       return;
     }
 
@@ -177,17 +191,16 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
     formData.append('weight', String(numericWeight));
     formData.append('payment_method', paymentMethod);
     formData.append('payment_status', paymentTiming === 'upfront' ? 'paid' : 'pending');
-    if (paymentTiming === 'upfront' && paymentMethod === 'transfer' && paymentProofFile) {
+    if (paymentTiming === 'upfront' && ['transfer', 'qris'].includes(paymentMethod) && paymentProofFile) {
       formData.append('payment_proof', paymentProofFile);
+    }
+    if (appliedVoucher) {
+      formData.append('voucher_code', appliedVoucher.code);
     }
 
     try {
       const res = await api.createTransaction(formData);
       const transactionId = res.data?.id;
-
-      if (selectedVoucher && transactionId) {
-        await api.applyVoucher(transactionId, selectedVoucher.voucher_code);
-      }
 
       if (conditionFile && transactionId) {
         await api.uploadConditionImages(transactionId, conditionFile);
@@ -304,55 +317,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
         )}
       </div>
 
-      {/* Voucher Selection */}
-      {selectedCustomer && (
-        <div className="space-y-1.5 p-3.5 bg-muted/30 border border-border rounded-xl">
-          <div className="flex items-center space-x-1.5 text-xs font-semibold text-foreground">
-            <Ticket className="h-4 w-4 text-primary" />
-            <span>Pilih Voucher Pelanggan (Opsional)</span>
-          </div>
-          
-          {loadingVouchers ? (
-            <div className="flex items-center text-xs text-muted-foreground pt-1">
-              <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
-              <span>Memuat voucher aktif...</span>
-            </div>
-          ) : customerVouchers.length > 0 ? (
-            <div className="relative pt-1.5">
-              <select
-                value={selectedVoucher ? selectedVoucher.id : ''}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === '') {
-                    setSelectedVoucher(null);
-                  } else {
-                    const v = customerVouchers.find((cv) => cv.id === Number(val));
-                    setSelectedVoucher(v || null);
-                  }
-                }}
-                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground"
-              >
-                <option value="">-- Tanpa Voucher --</option>
-                {customerVouchers.map((cv) => {
-                  const v = cv.voucher;
-                  const desc = v
-                    ? `${v.voucher_name} (Disc. ${v.discount_type === 'percentage' ? `${v.discount_value}%` : `Rp ${Number(v.discount_value).toLocaleString()}`})`
-                    : `Discount Rp ${Number(cv.discount_value).toLocaleString()}`;
-                  return (
-                    <option key={cv.id} value={cv.id}>
-                      {cv.voucher_code} - {desc}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground pt-1 pl-5">
-              Pelanggan ini tidak memiliki voucher loyalitas yang belum terpakai.
-            </p>
-          )}
-        </div>
-      )}
+
 
       {/* Service Selection */}
       <div className="space-y-1">
@@ -416,8 +381,8 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
       {/* Payment Method */}
       <div className="space-y-1">
         <label className="text-sm font-medium text-foreground">Payment Method *</label>
-        <div className="grid grid-cols-2 gap-4">
-          <label className={`flex items-center justify-center border rounded-lg p-3 cursor-pointer text-sm font-medium transition-all focus-within:ring-2 focus-within:ring-ring focus-within:border-primary ${
+        <div className="grid grid-cols-3 gap-3">
+          <label className={`flex items-center justify-center border rounded-lg p-2.5 cursor-pointer text-xs font-medium transition-all focus-within:ring-2 focus-within:ring-ring focus-within:border-primary ${
             paymentMethod === 'cash'
               ? 'border-primary bg-primary/5 text-primary'
               : 'border-border bg-background hover:bg-accent text-foreground'
@@ -429,6 +394,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
               checked={paymentMethod === 'cash'}
               onChange={() => {
                 setPaymentMethod('cash');
+                setPaymentTiming('upfront');
                 setPaymentProofFile(null);
                 setPaymentProofPreview(null);
               }}
@@ -436,7 +402,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
             />
             Cash
           </label>
-          <label className={`flex items-center justify-center border rounded-lg p-3 cursor-pointer text-sm font-medium transition-all focus-within:ring-2 focus-within:ring-ring focus-within:border-primary ${
+          <label className={`flex items-center justify-center border rounded-lg p-2.5 cursor-pointer text-xs font-medium transition-all focus-within:ring-2 focus-within:ring-ring focus-within:border-primary ${
             paymentMethod === 'transfer'
               ? 'border-primary bg-primary/5 text-primary'
               : 'border-border bg-background hover:bg-accent text-foreground'
@@ -450,6 +416,21 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
               className="sr-only"
             />
             Transfer
+          </label>
+          <label className={`flex items-center justify-center border rounded-lg p-2.5 cursor-pointer text-xs font-medium transition-all focus-within:ring-2 focus-within:ring-ring focus-within:border-primary ${
+            paymentMethod === 'qris'
+              ? 'border-primary bg-primary/5 text-primary'
+              : 'border-border bg-background hover:bg-accent text-foreground'
+          }`}>
+            <input
+              type="radio"
+              name="paymentMethod"
+              value="qris"
+              checked={paymentMethod === 'qris'}
+              onChange={() => setPaymentMethod('qris')}
+              className="sr-only"
+            />
+            QRIS
           </label>
         </div>
 
@@ -486,7 +467,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
           </div>
         </div>
 
-        {paymentMethod === 'transfer' && paymentTiming === 'upfront' && (
+        {['transfer', 'qris'].includes(paymentMethod) && paymentTiming === 'upfront' && (
           <div className="space-y-1.5 pt-2 animate-in fade-in-50 duration-200">
             <label className="text-sm font-semibold text-foreground">Payment Proof Image *</label>
             {paymentProofPreview ? (
@@ -573,6 +554,43 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
           </div>
         )}
       </div>
+
+      {/* Voucher Selection */}
+      {selectedCustomer && paymentTiming === 'upfront' && (
+        <div className="space-y-2 p-3.5 bg-muted/30 border border-border rounded-xl">
+          <div className="flex items-center space-x-1.5 text-xs font-semibold text-foreground">
+            <Ticket className="h-4 w-4 text-primary" />
+            <span>Masukkan Kode Voucher (Opsional)</span>
+          </div>
+          <div className="flex gap-2 pt-1.5">
+            <input
+              type="text"
+              placeholder="Masukkan kode voucher customer..."
+              value={voucherCode}
+              onChange={(e) => setVoucherCode(e.target.value)}
+              className="flex-1 bg-background border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground uppercase"
+            />
+            <button
+              type="button"
+              onClick={handleApplyVoucher}
+              disabled={checkingVoucher || !voucherCode.trim()}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-1.5 rounded-lg text-sm font-semibold transition-all cursor-pointer disabled:opacity-50"
+            >
+              {checkingVoucher ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                'Terapkan'
+              )}
+            </button>
+          </div>
+          {voucherError && (
+            <p className="text-xs text-destructive pt-1 pl-1 font-medium">{voucherError}</p>
+          )}
+          {voucherSuccessMsg && (
+            <p className="text-xs text-emerald-500 pt-1 pl-1 font-medium">{voucherSuccessMsg}</p>
+          )}
+        </div>
+      )}
 
       {/* Summary Box */}
       <div className="bg-muted p-4 rounded-lg space-y-3 text-sm border border-border">

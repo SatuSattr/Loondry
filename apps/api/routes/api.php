@@ -46,6 +46,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/points', [VoucherController::class, 'pointsBalance']);
     Route::post('/vouchers/redeem', [VoucherController::class, 'redeem']);
     Route::get('/vouchers', [VoucherController::class, 'myVouchers']);
+    Route::get('/vouchers/check/{voucher_code}', [VoucherController::class, 'checkVoucherCode']);
     Route::post('/transactions/{transaction}/apply-voucher', [VoucherController::class, 'applyVoucher']);
 
     // Shared or Customer routes

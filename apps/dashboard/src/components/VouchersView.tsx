@@ -160,7 +160,7 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
-          Voucher Templates (CRUD)
+          Voucher Templates
         </button>
         <button
           onClick={() => {
@@ -173,7 +173,7 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
-          Customer Redemptions Log
+          Voucher Redemptions Log
         </button>
       </div>
 

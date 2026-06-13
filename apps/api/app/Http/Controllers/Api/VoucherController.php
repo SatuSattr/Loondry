@@ -160,7 +160,7 @@ class VoucherController extends Controller
             }
         }
 
-        $voucherCode = strtoupper($voucher->code . '-' . Str::random(6));
+        $voucherCode = strtoupper($voucher->code . '-' . $targetUser->id . '-' . Str::random(6));
 
         try {
             $redemption = DB::transaction(function () use ($targetUser, $voucher, $voucherCode) {
@@ -180,6 +180,7 @@ class VoucherController extends Controller
                     'points_spent' => $voucher->points_cost,
                     'discount_value' => $voucher->discount_value,
                     'is_used' => false,
+                    'expires_at' => now()->addDays(3),
                 ]);
             });
         } catch (\Exception $e) {
@@ -234,77 +235,68 @@ class VoucherController extends Controller
         }
 
         $request->validate([
-            'voucher_code' => ['required', 'string', 'exists:points_redemptions,voucher_code'],
+            'voucher_code' => ['required', 'string'],
         ]);
 
-        $redemption = PointsRedemption::with('voucher')
-            ->where('voucher_code', $request->voucher_code)
-            ->where('is_used', false)
-            ->first();
+        try {
+            $result = PointsRedemption::validateAndCalculateDiscount(
+                $request->voucher_code,
+                $transaction->total_price,
+                $transaction->customer_id
+            );
 
-        if (!$redemption) {
-            return response()->json(['message' => 'Voucher not found or already used'], 404);
-        }
+            $redemption = $result['redemption'];
+            $discount = $result['discount'];
 
-        if ($redemption->user_id !== $transaction->customer->user_id) {
-            return response()->json(['message' => 'Voucher belongs to another customer'], 403);
-        }
+            DB::transaction(function () use ($transaction, $redemption, $discount) {
+                $transaction->update([
+                    'voucher_code' => $redemption->voucher_code,
+                    'discount' => $discount,
+                ]);
 
-        // If it's linked to an admin voucher template, validate and calculate dynamically
-        $discount = 0;
-        if ($redemption->voucher) {
-            $voucher = $redemption->voucher;
-            $today = now()->startOfDay();
+                $redemption->update([
+                    'is_used' => true,
+                    'used_at' => now(),
+                ]);
+            });
 
-            // Validate date range
-            if ($voucher->start_date && $today->lt($voucher->start_date)) {
-                return response()->json(['message' => 'Voucher is not valid yet'], 400);
-            }
-            if ($voucher->end_date && $today->gt($voucher->end_date)) {
-                return response()->json(['message' => 'Voucher has expired'], 400);
-            }
-
-            // Validate minimum transaction amount
-            if ($voucher->min_transaction && $transaction->total_price < $voucher->min_transaction) {
-                return response()->json([
-                    'message' => 'Minimum transaction required to use this voucher is Rp ' . number_format($voucher->min_transaction)
-                ], 400);
-            }
-
-            // Calculate discount
-            if ($voucher->discount_type === 'percentage') {
-                $discount = $transaction->total_price * ($voucher->discount_value / 100);
-                if ($voucher->max_discount && $discount > $voucher->max_discount) {
-                    $discount = $voucher->max_discount;
-                }
-            } else {
-                $discount = $voucher->discount_value;
-            }
-        } else {
-            // Old legacy code (direct points-to-cash redemption value)
-            $discount = $redemption->discount_value;
-        }
-
-        // Cap discount at total price
-        if ($discount > $transaction->total_price) {
-            $discount = $transaction->total_price;
-        }
-
-        DB::transaction(function () use ($transaction, $redemption, $discount) {
-            $transaction->update([
-                'voucher_code' => $redemption->voucher_code,
-                'discount' => $discount,
+            return response()->json([
+                'message' => 'Voucher applied successfully',
+                'data' => $transaction->fresh()->load(['customer.user', 'service']),
             ]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 400);
+        }
+    }
 
-            $redemption->update([
-                'is_used' => true,
-                'used_at' => now(),
-            ]);
-        });
-
-        return response()->json([
-            'message' => 'Voucher applied successfully',
-            'data' => $transaction->fresh()->load(['customer.user', 'service']),
+    /**
+     * Check voucher code validity and return discount value.
+     */
+    public function checkVoucherCode(Request $request, string $voucherCode)
+    {
+        $request->validate([
+            'total_price' => ['required', 'numeric', 'min:0'],
+            'customer_id' => ['required', 'integer', 'exists:customers,id'],
         ]);
+
+        try {
+            $result = PointsRedemption::validateAndCalculateDiscount(
+                $voucherCode,
+                $request->total_price,
+                $request->customer_id
+            );
+
+            return response()->json([
+                'valid' => true,
+                'discount' => $result['discount'],
+                'voucher_code' => $result['redemption']->voucher_code,
+                'name' => $result['redemption']->voucher ? $result['redemption']->voucher->name : 'Point Redemption Discount',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'valid' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
     }
 }

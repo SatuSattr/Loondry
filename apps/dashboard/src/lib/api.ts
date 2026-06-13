@@ -136,16 +136,22 @@ export const api = {
   },
   
   // Upload payment proof
-  uploadPaymentProof: (id: number, file?: File | null) => {
+  uploadPaymentProof: (id: number, file?: File | null, voucherCode?: string) => {
     const formData = new FormData();
     if (file) {
       formData.append('payment_proof', file);
+    }
+    if (voucherCode) {
+      formData.append('voucher_code', voucherCode);
     }
     return request(`/transactions/${id}/payment`, {
       method: 'POST',
       body: formData,
     });
   },
+
+  checkVoucherCode: (voucherCode: string, totalPrice: number, customerId: number) =>
+    request(`/vouchers/check/${encodeURIComponent(voucherCode)}?total_price=${totalPrice}&customer_id=${customerId}`),
 
   // Customer vouchers & redemptions
   getCustomerVouchers: (userId?: number) => request(`/vouchers${userId ? `?user_id=${userId}` : ''}`),

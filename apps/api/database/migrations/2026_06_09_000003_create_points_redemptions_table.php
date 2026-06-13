@@ -16,6 +16,7 @@ return new class extends Migration
             $table->decimal('discount_value', 12, 2);
             $table->boolean('is_used')->default(false);
             $table->timestamp('used_at')->nullable();
+            $table->timestamp('expires_at')->nullable();
             $table->timestamps();
         });
     }

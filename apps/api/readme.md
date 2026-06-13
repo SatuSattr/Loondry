@@ -70,6 +70,7 @@ Each endpoint group is documented in a separate file under the `documentation/` 
 | GET | `/api/points` | Sanctum | - |
 | POST | `/api/vouchers/redeem` | Sanctum | - |
 | GET | `/api/vouchers` | Sanctum | - |
+| GET | `/api/vouchers/check/{voucher_code}` | Sanctum | - |
 | POST | `/api/transactions/{transaction}/apply-voucher` | Sanctum | admin |
 | GET | `/api/admin/vouchers` | Sanctum | admin |
 | GET | `/api/vouchers-templates` | Sanctum | admin |
