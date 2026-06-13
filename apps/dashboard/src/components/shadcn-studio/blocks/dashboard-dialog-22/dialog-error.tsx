@@ -19,7 +19,9 @@ import { cn } from '@/lib/utils'
 import { TriangleAlertIcon } from 'lucide-react'
 
 type Props = {
-  trigger: ReactElement
+  trigger?: ReactElement
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
   defaultOpen?: boolean
   className?: string
   title?: string
@@ -33,6 +35,8 @@ type Props = {
 }
 
 const ErrorDialog = ({
+  open,
+  onOpenChange,
   defaultOpen = false,
   trigger,
   className,
@@ -45,11 +49,24 @@ const ErrorDialog = ({
   checkboxLabel = "Don't ask again",
   onCheckboxChange
 }: Props) => {
-  const [open, setOpen] = useState(defaultOpen)
+  const [internalOpen, setInternalOpen] = useState(defaultOpen)
+  
+  const isControlled = open !== undefined
+  const isOpen = isControlled ? open : internalOpen
+  
+  const handleOpenChange = (val: boolean) => {
+    if (isControlled) {
+      if (onOpenChange) {
+        onOpenChange(val)
+      }
+    } else {
+      setInternalOpen(val)
+    }
+  }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={trigger} />
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      {trigger && <DialogTrigger render={trigger} />}
       <DialogContent className={cn('sm:max-w-145 [&>[data-slot=dialog-close]>svg]:size-5', className)}>
         <DialogHeader className='items-center gap-4'>
           <Avatar className='border-destructive bg-destructive/10 dark:border-destructive/10 dark:bg-destructive/10 size-15 border p-2'>

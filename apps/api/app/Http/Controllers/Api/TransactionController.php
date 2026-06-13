@@ -124,6 +124,18 @@ class TransactionController extends Controller
             'status' => ['required', 'in:antrian,dicuci,disetrika,siap diambil,diambil'],
         ]);
 
+        if ($transaction->status === 'diambil') {
+            return response()->json([
+                'message' => 'Transaksi yang sudah selesai (diambil) tidak dapat diubah statusnya lagi.',
+            ], 422);
+        }
+
+        if ($request->status === 'diambil' && $transaction->payment_status === 'pending') {
+            return response()->json([
+                'message' => 'Transaksi tidak dapat diselesaikan karena pembayaran masih tertunda (pending). Silakan lakukan pelunasan terlebih dahulu.',
+            ], 422);
+        }
+
         if ($transaction->status !== $request->status) {
             DB::transaction(function () use ($request, $transaction) {
                 $transaction->update(['status' => $request->status]);

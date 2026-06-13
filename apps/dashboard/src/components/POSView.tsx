@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import ErrorDialog from './shadcn-studio/blocks/dashboard-dialog-22/dialog-error';
 
 interface POSViewProps {
   onOpenCreateOrder: () => void;
@@ -62,14 +63,17 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
     loadTransactions();
   }, []);
 
+  const [confirmingTxId, setConfirmingTxId] = useState<number | null>(null);
+
   const handleStatusChange = async (id: number, newStatus: string) => {
     if (newStatus === 'diambil') {
-      const confirmCompleted = window.confirm(
-        "Apakah Anda yakin ingin menyelesaikan transaksi ini? Setelah status diubah menjadi 'diambil', status transaksi tidak dapat diubah lagi."
-      );
-      if (!confirmCompleted) return;
+      setConfirmingTxId(id);
+      return;
     }
+    await executeStatusChange(id, newStatus);
+  };
 
+  const executeStatusChange = async (id: number, newStatus: string) => {
     setUpdatingStatusId(id);
     try {
       await api.updateTransactionStatus(id, newStatus);
@@ -367,6 +371,7 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
                               <DropdownMenuContent className="w-48 bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
                                 {Object.entries(statusLabels)
                                   .filter(([key]) => key !== 'all')
+                                  .filter(([key]) => !(key === 'diambil' && tx.payment_status === 'pending'))
                                   .map(([key, val]) => (
                                     <DropdownMenuItem
                                       key={key}
@@ -398,7 +403,7 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
                         <td className="p-4">
                           <div className="flex items-center justify-center space-x-1.5">
                             {/* Pay (Upload Proof) */}
-                            {tx.payment_status !== 'paid' && tx.status !== 'diambil' ? (
+                            {tx.payment_status !== 'paid' ? (
                               <button
                                 onClick={() => onOpenPaymentProof(tx)}
                                 className="p-1.5 rounded-md border border-border bg-background hover:bg-accent text-foreground transition-all cursor-pointer"
@@ -471,6 +476,24 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
             />
           </div>
         </div>
+      )}
+
+      {confirmingTxId !== null && (
+        <ErrorDialog
+          open={confirmingTxId !== null}
+          onOpenChange={(open) => {
+            if (!open) setConfirmingTxId(null);
+          }}
+          title="Selesaikan Transaksi?"
+          description="Apakah Anda yakin ingin menyelesaikan transaksi ini? Setelah status diubah menjadi 'diambil' (Completed), status transaksi tidak dapat diubah lagi."
+          confirmText="Ya, Selesaikan"
+          cancelText="Batal"
+          showCheckbox={false}
+          onConfirm={() => {
+            executeStatusChange(confirmingTxId, 'diambil');
+            setConfirmingTxId(null);
+          }}
+        />
       )}
     </div>
   );

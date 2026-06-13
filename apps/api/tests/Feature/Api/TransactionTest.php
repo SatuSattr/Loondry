@@ -210,3 +210,47 @@ test('admin can upload transaction condition images', function () {
     expect($transaction->images)->toHaveCount(1);
     Storage::disk('public')->assertExists($transaction->images->first()->image_path);
 });
+
+test('admin cannot update status of completed transaction', function () {
+    $this->actingAs($this->admin, 'sanctum');
+
+    $transaction = Transaction::create([
+        'invoice_code' => 'LND-100',
+        'admin_id' => $this->admin->id,
+        'customer_id' => $this->customer->id,
+        'service_id' => $this->service->id,
+        'weight' => 2,
+        'total_price' => 16000,
+        'status' => 'diambil',
+        'payment_method' => 'cash',
+        'payment_status' => 'paid',
+    ]);
+
+    $response = $this->putJson("/api/transactions/{$transaction->id}/status", [
+        'status' => 'dicuci',
+    ]);
+
+    $response->assertStatus(422);
+});
+
+test('admin cannot complete transaction if payment is pending', function () {
+    $this->actingAs($this->admin, 'sanctum');
+
+    $transaction = Transaction::create([
+        'invoice_code' => 'LND-101',
+        'admin_id' => $this->admin->id,
+        'customer_id' => $this->customer->id,
+        'service_id' => $this->service->id,
+        'weight' => 2,
+        'total_price' => 16000,
+        'status' => 'antrian',
+        'payment_method' => 'cash',
+        'payment_status' => 'pending',
+    ]);
+
+    $response = $this->putJson("/api/transactions/{$transaction->id}/status", [
+        'status' => 'diambil',
+    ]);
+
+    $response->assertStatus(422);
+});
