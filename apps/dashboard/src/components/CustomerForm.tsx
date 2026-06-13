@@ -195,7 +195,8 @@ export function CustomerForm({ customer, onSubmitSuccess, onCancel }: CustomerFo
               render={
                 <Button
                   variant="outline"
-                  className="w-full justify-between h-9 text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
+                  size="lg"
+                  className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
                 >
                   <span>{gender === 'L' ? 'Male (L)' : 'Female (P)'}</span>
                   <ChevronDown className="h-4 w-4 opacity-50 ml-2" />

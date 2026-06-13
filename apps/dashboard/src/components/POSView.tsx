@@ -174,7 +174,7 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
-                <Button variant="outline" size="sm" className="h-9 gap-1.5 cursor-pointer text-xs font-semibold text-foreground">
+                <Button variant="outline" size="lg" className="gap-1.5 cursor-pointer text-xs font-semibold text-foreground">
                   <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
                   <span>Status: {statusFilter === 'all' ? 'All' : statusLabels[statusFilter]}</span>
                 </Button>
@@ -197,7 +197,7 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
-                <Button variant="outline" size="sm" className="h-9 gap-1.5 cursor-pointer text-xs font-semibold text-foreground">
+                <Button variant="outline" size="lg" className="gap-1.5 cursor-pointer text-xs font-semibold text-foreground">
                   <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
                   <span>Payment: {paymentFilter === 'all' ? 'All' : paymentLabels[paymentFilter]}</span>
                 </Button>
@@ -220,12 +220,12 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
           {(statusFilter !== 'all' || paymentFilter !== 'all') && (
             <Button
               variant="ghost"
-              size="sm"
+              size="lg"
               onClick={() => {
                 setStatusFilter('all');
                 setPaymentFilter('all');
               }}
-              className="h-9 px-2.5 text-muted-foreground hover:text-foreground hover:bg-accent/50 cursor-pointer text-xs"
+              className="px-2.5 text-muted-foreground hover:text-foreground hover:bg-accent/50 cursor-pointer text-xs"
               title="Clear all filters"
             >
               <X className="h-4 w-4 mr-1 text-muted-foreground" />

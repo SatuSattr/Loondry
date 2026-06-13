@@ -158,7 +158,8 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
               render={
                 <Button
                   variant="outline"
-                  className="w-full justify-between h-9 text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
+                  size="lg"
+                  className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
                 >
                   <span>{discountType === 'percentage' ? 'Percentage (%)' : 'Flat Amount (Rp)'}</span>
                   <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
@@ -250,7 +251,8 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
               render={
                 <Button
                   variant="outline"
-                  className="w-full justify-between h-9 text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
+                  size="lg"
+                  className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
                 >
                   <span className="capitalize">{status}</span>
                   <ChevronDown className="h-4 w-4 opacity-50 ml-2" />

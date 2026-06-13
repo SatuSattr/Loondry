@@ -250,8 +250,7 @@ export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer }: Dashb
                     render={
                       <Button
                         variant="outline"
-                        size="sm"
-                        className="h-8 text-xs font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer justify-between w-full sm:w-56"
+                        className="text-xs font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer justify-between w-full sm:w-56"
                       >
                         <div className="flex items-center">
                           <CalendarIcon className="h-3.5 w-3.5 mr-1.5 opacity-70" />
@@ -279,9 +278,8 @@ export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer }: Dashb
               {dateRange && (
                 <Button
                   variant="ghost"
-                  size="sm"
                   onClick={() => setDateRange(undefined)}
-                  className="h-8 px-2 text-xs text-muted-foreground hover:text-destructive cursor-pointer"
+                  className="px-2 text-xs text-muted-foreground hover:text-destructive cursor-pointer"
                   title="Clear date filter"
                 >
                   Clear
