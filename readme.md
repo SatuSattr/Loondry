@@ -8,9 +8,9 @@ Laundry Point of Sales (POS) Ecosystem — a laundry management application cons
 
 | Apps | Path | Stack |
 |------|------|-------|
-| **REST API** | [`apps/api`](./api) | Laravel + Sanctum |
-| **Web Admin** | [`apps/dashboard`](./dashboard) | Vite + React + shadcn/ui |
-| **Mobile App** | [`apps/mobile`](./mobile) | Expo + React Native |
+| **REST API** | [`apps/api/`](./api) | Laravel + Sanctum |
+| **Web Admin** | [`apps/dashboard/`](./dashboard) | Vite + React + shadcn/ui |
+| **Mobile App** | [`apps/mobile/`](./mobile) | Expo + React Native |
 
 ## Getting Started
 
