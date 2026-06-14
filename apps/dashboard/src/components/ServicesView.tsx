@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
-import { Loader2, Edit, Trash2, PlusCircle, RefreshCw, Layers, Search } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { Loader2, Edit, Trash2, PlusCircle, RefreshCw, Layers, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import ErrorDialog from '@/components/shadcn-studio/blocks/dashboard-dialog-22/dialog-error';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface ServicesViewProps {
   onOpenCreateService: () => void;
@@ -56,8 +59,9 @@ export function ServicesView({ onOpenCreateService, onOpenEditService }: Service
     try {
       await api.deleteService(service.id);
       setServices((prev) => prev.filter((s) => s.id !== service.id));
+      toast.success('Service deleted successfully');
     } catch (err: any) {
-      alert(err.message || 'Failed to delete service');
+      toast.error(err.message || 'Failed to delete service');
     }
   };
 
@@ -77,8 +81,10 @@ export function ServicesView({ onOpenCreateService, onOpenEditService }: Service
       await Promise.all(selectedIds.map((id) => api.deleteService(id)));
       setServices((prev) => prev.filter((s) => !selectedIds.includes(s.id)));
       setSelectedIds([]);
+      toast.success('Selected services deleted successfully');
     } catch (err: any) {
       setError(err.message || 'Failed to delete selected services');
+      toast.error(err.message || 'Failed to delete selected services');
     } finally {
       setBulkDeleting(false);
     }
@@ -89,6 +95,19 @@ export function ServicesView({ onOpenCreateService, onOpenEditService }: Service
     s.service_name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
     s.unit.toLowerCase().includes(debouncedSearch.toLowerCase())
   );
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
+  const totalItems = filteredServices.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedServices = filteredServices.slice(startIndex, startIndex + itemsPerPage);
+
+  // Reset to page 1 on filter/search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   return (
     <div className="space-y-6">
@@ -181,8 +200,8 @@ export function ServicesView({ onOpenCreateService, onOpenEditService }: Service
       ) : displayMode === 'cards' ? (
         /* Card Layout */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredServices.length > 0 ? (
-            filteredServices.map((s) => (
+          {paginatedServices.length > 0 ? (
+            paginatedServices.map((s) => (
               <div
                 key={s.id}
                 className="bg-card border border-border rounded-xl p-5 shadow-xs flex flex-col justify-between hover:border-primary/40 hover:shadow-md transition-all space-y-4"
@@ -258,18 +277,18 @@ export function ServicesView({ onOpenCreateService, onOpenEditService }: Service
               <thead>
                 <tr className="border-b border-border bg-muted/40 text-muted-foreground text-xs uppercase tracking-wider">
                   <th className="p-4 w-12 text-center">
-                    <input
-                      type="checkbox"
-                      checked={filteredServices.length > 0 && selectedIds.length === filteredServices.length}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedIds(filteredServices.map((s) => s.id));
-                        } else {
-                          setSelectedIds([]);
-                        }
-                      }}
-                      className="rounded border-border text-primary cursor-pointer h-4 w-4 focus:ring-ring bg-background"
-                    />
+                    <div className="flex justify-center">
+                      <Checkbox
+                        checked={filteredServices.length > 0 && selectedIds.length === filteredServices.length}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedIds(filteredServices.map((s) => s.id));
+                          } else {
+                            setSelectedIds([]);
+                          }
+                        }}
+                      />
+                    </div>
                   </th>
                   <th className="p-4">Service Name</th>
                   <th className="p-4">Unit</th>
@@ -279,8 +298,8 @@ export function ServicesView({ onOpenCreateService, onOpenEditService }: Service
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredServices.length > 0 ? (
-                  filteredServices.map((s) => (
+                {paginatedServices.length > 0 ? (
+                  paginatedServices.map((s) => (
                     <tr
                       key={s.id}
                       className={`hover:bg-accent/25 text-foreground transition-all ${
@@ -288,18 +307,18 @@ export function ServicesView({ onOpenCreateService, onOpenEditService }: Service
                       }`}
                     >
                       <td className="p-4 w-12 text-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(s.id)}
-                          onChange={() => {
-                            setSelectedIds((prev) =>
-                              prev.includes(s.id)
-                                ? prev.filter((id) => id !== s.id)
-                                : [...prev, s.id]
-                            );
-                          }}
-                          className="rounded border-border text-primary cursor-pointer h-4 w-4 focus:ring-ring bg-background"
-                        />
+                        <div className="flex justify-center">
+                          <Checkbox
+                            checked={selectedIds.includes(s.id)}
+                            onCheckedChange={(checked) => {
+                              setSelectedIds((prev) =>
+                                checked
+                                  ? [...prev, s.id]
+                                  : prev.filter((id) => id !== s.id)
+                              );
+                            }}
+                          />
+                        </div>
                       </td>
                       <td className="p-4 font-semibold text-sm">
                         {s.service_name}
@@ -357,6 +376,80 @@ export function ServicesView({ onOpenCreateService, onOpenEditService }: Service
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between border-t border-border pt-4 mt-4 bg-card px-4 py-3 rounded-xl shadow-xs">
+          <div className="flex flex-1 justify-between sm:hidden">
+            <Button
+              variant="outline"
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="cursor-pointer"
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="cursor-pointer"
+            >
+              Next
+            </Button>
+          </div>
+          <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground">
+                Showing <span className="font-semibold text-foreground">{startIndex + 1}</span> to{' '}
+                <span className="font-semibold text-foreground">
+                  {Math.min(startIndex + itemsPerPage, totalItems)}
+                </span>{' '}
+                of <span className="font-semibold text-foreground">{totalItems}</span> results
+              </p>
+            </div>
+            <div>
+              <nav className="isolate inline-flex -space-x-px rounded-md shadow-xs" aria-label="Pagination">
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="relative inline-flex items-center rounded-l-md px-2.5 py-2 text-muted-foreground ring-1 ring-inset ring-border hover:bg-accent focus:z-20 focus:outline-offset-0 disabled:opacity-40 cursor-pointer text-xs"
+                >
+                  <ChevronLeft className="h-4.5 w-4.5" />
+                </button>
+                {(() => {
+                  const maxButtons = 5;
+                  let start = Math.max(1, currentPage - 2);
+                  let end = Math.min(totalPages, start + maxButtons - 1);
+                  if (end - start + 1 < maxButtons) {
+                    start = Math.max(1, end - maxButtons + 1);
+                  }
+                  return Array.from({ length: end - start + 1 }, (_, idx) => start + idx);
+                })().map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`relative inline-flex items-center px-3.5 py-2 text-xs font-semibold ring-1 ring-inset ring-border focus:z-20 cursor-pointer ${
+                      currentPage === page
+                        ? 'z-10 bg-primary text-primary-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
+                        : 'text-foreground hover:bg-accent'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="relative inline-flex items-center rounded-r-md px-2.5 py-2 text-muted-foreground ring-1 ring-inset ring-border hover:bg-accent focus:z-20 focus:outline-offset-0 disabled:opacity-40 cursor-pointer text-xs"
+                >
+                  <ChevronRight className="h-4.5 w-4.5" />
+                </button>
+              </nav>
+            </div>
           </div>
         </div>
       )}

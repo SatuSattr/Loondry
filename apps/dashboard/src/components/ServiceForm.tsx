@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../lib/api';
+import toast from 'react-hot-toast';
 import { Loader2, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -55,12 +56,15 @@ export function ServiceForm({ service, onSubmitSuccess, onCancel }: ServiceFormP
     try {
       if (service) {
         await api.updateService(service.id, payload);
+        toast.success('Service updated successfully');
       } else {
         await api.createService(payload);
+        toast.success('Service created successfully');
       }
       onSubmitSuccess();
     } catch (err: any) {
       setError(err.message || 'Failed to save service');
+      toast.error(err.message || 'Failed to save service');
     } finally {
       setLoading(false);
     }
@@ -79,10 +83,11 @@ export function ServiceForm({ service, onSubmitSuccess, onCancel }: ServiceFormP
         <input
           type="text"
           required
+          disabled={loading}
           value={serviceName}
           onChange={(e) => setServiceName(e.target.value)}
           placeholder="e.g. Wash & Iron Express"
-          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring"
+          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring disabled:opacity-50"
         />
       </div>
 
@@ -92,10 +97,11 @@ export function ServiceForm({ service, onSubmitSuccess, onCancel }: ServiceFormP
           type="number"
           required
           min="0"
+          disabled={loading}
           value={price}
           onChange={(e) => setPrice(e.target.value)}
           placeholder="e.g. 10000"
-          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring"
+          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring disabled:opacity-50"
         />
       </div>
 
@@ -109,7 +115,8 @@ export function ServiceForm({ service, onSubmitSuccess, onCancel }: ServiceFormP
                   <Button
                     variant="outline"
                     size="lg"
-                    className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
+                    disabled={loading}
+                    className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer disabled:opacity-50"
                   >
                     <span>{unit}</span>
                     <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
@@ -118,7 +125,7 @@ export function ServiceForm({ service, onSubmitSuccess, onCancel }: ServiceFormP
               />
               <DropdownMenuContent className="w-[150px] bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
                 <DropdownMenuItem
-                  onClick={() => setUnit('Kg')}
+                  onClick={() => !loading && setUnit('Kg')}
                   className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
                     unit === 'Kg' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
                   }`}
@@ -126,7 +133,7 @@ export function ServiceForm({ service, onSubmitSuccess, onCancel }: ServiceFormP
                   Kg
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={() => setUnit('Pcs')}
+                  onClick={() => !loading && setUnit('Pcs')}
                   className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
                     unit === 'Pcs' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
                   }`}
@@ -147,7 +154,8 @@ export function ServiceForm({ service, onSubmitSuccess, onCancel }: ServiceFormP
                   <Button
                     variant="outline"
                     size="lg"
-                    className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
+                    disabled={loading}
+                    className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer disabled:opacity-50"
                   >
                     <span className="capitalize">{status}</span>
                     <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
@@ -156,7 +164,7 @@ export function ServiceForm({ service, onSubmitSuccess, onCancel }: ServiceFormP
               />
               <DropdownMenuContent className="w-[150px] bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
                 <DropdownMenuItem
-                  onClick={() => setStatus('active')}
+                  onClick={() => !loading && setStatus('active')}
                   className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
                     status === 'active' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
                   }`}
@@ -164,7 +172,7 @@ export function ServiceForm({ service, onSubmitSuccess, onCancel }: ServiceFormP
                   Active
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={() => setStatus('inactive')}
+                  onClick={() => !loading && setStatus('inactive')}
                   className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
                     status === 'inactive' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
                   }`}

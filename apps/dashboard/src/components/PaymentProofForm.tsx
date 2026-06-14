@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { api } from '../lib/api';
+import { api, API_BASE } from '../lib/api';
 import { Loader2, UploadCloud, Ticket, Check } from 'lucide-react';
 
 interface PaymentProofFormProps {
@@ -14,6 +14,40 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
   
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+
+  const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+
+  const handleApprove = async () => {
+    setApproving(true);
+    setError('');
+    try {
+      await api.approvePayment(transaction.id);
+      onSubmitSuccess();
+    } catch (err: any) {
+      setError(err.message || 'Failed to approve payment');
+    } finally {
+      setApproving(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!confirm('Are you sure you want to reject this payment proof? This will remove the uploaded proof and reset the transaction payment details.')) {
+      return;
+    }
+    setRejecting(true);
+    setError('');
+    try {
+      await api.rejectPayment(transaction.id);
+      onSubmitSuccess();
+    } catch (err: any) {
+      setError(err.message || 'Failed to reject payment');
+    } finally {
+      setRejecting(false);
+    }
+  };
+
+  const isReviewMode = transaction?.payment_proof && (transaction?.payment_status === 'pending' || transaction?.payment_status === 'pending_confirmation');
 
   // Payment Method state (only used if transaction.payment_method is null)
   const [paymentMethod, setPaymentMethod] = useState(transaction?.payment_method || 'cash');
@@ -97,6 +131,95 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
 
   const currentDiscount = Number(transaction?.discount || 0) + (appliedVoucher ? appliedVoucher.discount : 0);
   const amountDue = Math.max(0, Number(transaction?.total_price || 0) - currentDiscount);
+
+  if (isReviewMode) {
+    return (
+      <div className="space-y-6">
+        {error && (
+          <div className="bg-destructive/10 text-destructive border border-destructive/20 rounded-lg p-3 text-sm font-medium">
+            {error}
+          </div>
+        )}
+
+        {/* Transaction Details */}
+        <div className="bg-muted p-4 rounded-lg space-y-2 text-sm border border-border">
+          <h4 className="font-semibold text-foreground tracking-tight">Review Payment Proof</h4>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Invoice Code</span>
+            <span className="font-mono font-medium">{transaction?.invoice_code}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Customer</span>
+            <span className="font-medium">{transaction?.customer?.user?.name}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Payment Method</span>
+            <span className="font-medium uppercase">{transaction?.payment_method}</span>
+          </div>
+          {Number(transaction?.discount || 0) > 0 && (
+            <div className="flex justify-between text-emerald-500 font-semibold">
+              <span>Voucher Discount</span>
+              <span>-Rp {Number(transaction?.discount || 0).toLocaleString()}</span>
+            </div>
+          )}
+          <div className="flex justify-between border-t border-border pt-2 text-base font-bold text-foreground">
+            <span>Amount Paid</span>
+            <span>Rp {Math.max(0, Number(transaction?.total_price || 0) - Number(transaction?.discount || 0)).toLocaleString()}</span>
+          </div>
+        </div>
+
+        {/* Payment Proof Image */}
+        <div className="space-y-2">
+          <label className="text-sm font-semibold text-foreground block">Uploaded Payment Proof</label>
+          <div className="border border-border rounded-xl p-2 bg-background flex flex-col items-center">
+            <a 
+              href={`${API_BASE}/storage/${transaction.payment_proof}`} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="w-full"
+            >
+              <img
+                src={`${API_BASE}/storage/${transaction.payment_proof}`}
+                alt="Payment Proof Uploaded by Customer"
+                className="max-h-[400px] rounded-lg object-contain border border-border bg-muted w-full hover:opacity-95 transition-opacity cursor-zoom-in"
+              />
+            </a>
+            <span className="text-[10px] text-muted-foreground mt-2">Click image to open in full screen</span>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col space-y-2 pt-4 border-t border-border">
+          <button
+            type="button"
+            onClick={handleApprove}
+            disabled={approving || rejecting}
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg font-semibold transition-colors cursor-pointer flex items-center justify-center text-sm disabled:opacity-50"
+          >
+            {approving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            Approve & Mark Paid
+          </button>
+          <button
+            type="button"
+            onClick={handleReject}
+            disabled={approving || rejecting}
+            className="w-full bg-destructive text-destructive-foreground hover:bg-destructive/90 py-2.5 rounded-lg font-semibold transition-colors cursor-pointer flex items-center justify-center text-sm disabled:opacity-50"
+          >
+            {rejecting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            Reject & Delete Proof
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={approving || rejecting}
+            className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/80 py-2.5 rounded-lg font-semibold transition-colors cursor-pointer flex items-center justify-center text-sm disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
@@ -196,12 +319,12 @@ export function PaymentProofForm({ transaction, onSubmitSuccess, onCancel }: Pay
         <div className="space-y-2 p-3 bg-muted/40 border border-border rounded-lg">
           <div className="flex items-center space-x-1.5 text-xs font-semibold text-foreground">
             <Ticket className="h-3.5 w-3.5 text-primary" />
-            <span>Use Shopping Voucher (Optional)</span>
+            <span>Apply Voucher Code</span>
           </div>
           <div className="flex gap-2 pt-1">
             <input
               type="text"
-              placeholder="Enter customer's voucher code..."
+              placeholder="Enter voucher code here"
               value={voucherCode}
               onChange={(e) => setVoucherCode(e.target.value)}
               className="flex-1 bg-background border border-border rounded-lg px-2.5 py-1.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground uppercase"

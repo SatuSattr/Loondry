@@ -70,4 +70,48 @@ class ProfileController extends Controller
             'user' => $user->fresh()->load('customer'),
         ]);
     }
+
+    /**
+     * Update the user's avatar.
+     */
+    public function avatar(Request $request)
+    {
+        $request->validate([
+            'avatar' => ['required', 'image', 'max:2048'],
+        ]);
+
+        $user = $request->user();
+
+        if ($user->avatar) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($user->avatar);
+        }
+
+        $path = $request->file('avatar')->store('avatars', 'public');
+        $user->update(['avatar' => $path]);
+
+        return response()->json([
+            'message' => 'Avatar updated successfully',
+            'avatar_url' => $user->avatar_url,
+            'user' => $user->fresh()->load('customer'),
+        ]);
+    }
+
+    /**
+     * Update the user's push notification device token.
+     */
+    public function updateDeviceToken(Request $request)
+    {
+        $request->validate([
+            'device_token' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $request->user()->update([
+            'device_token' => $request->device_token,
+        ]);
+
+        return response()->json([
+            'message' => 'Device token updated successfully',
+            'user' => $request->user()->fresh(),
+        ]);
+    }
 }

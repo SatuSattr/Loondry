@@ -33,6 +33,7 @@ Each endpoint group is documented in a separate file under the `documentation/` 
 | 7 | **Error Responses** — standard error formats (401, 403, 422, 404) | [`documentation/07-errors.md`](documentation/07-errors.md) |
 | 8 | **Entity Relationship** — database schema summary, relations, eager-loaded data | [`documentation/08-entity-relationship.md`](documentation/08-entity-relationship.md) |
 | 9 | **Points & Vouchers** — loyalty points, redeem vouchers, apply discounts | [`documentation/09-points-and-vouchers.md`](documentation/09-points-and-vouchers.md) |
+| 10 | **Notifications** — push notifications, device token registration, in-app notifications | [`documentation/10-notifications.md`](documentation/10-notifications.md) |
 
 ---
 
@@ -45,6 +46,7 @@ Each endpoint group is documented in a separate file under the `documentation/` 
 | GET | `/api/profile` | Sanctum | - |
 | PUT | `/api/profile` | Sanctum | - |
 | PUT | `/api/profile/password` | Sanctum | - |
+| POST | `/api/profile/device-token` | Sanctum | - |
 | PUT | `/api/profile/customer` | Sanctum | customer |
 | GET | `/api/dashboard` | Sanctum | admin |
 | GET | `/api/services` | Sanctum | admin |
@@ -78,3 +80,6 @@ Each endpoint group is documented in a separate file under the `documentation/` 
 | GET | `/api/vouchers-templates/{template}` | Sanctum | admin |
 | PUT | `/api/vouchers-templates/{template}` | Sanctum | admin |
 | DELETE | `/api/vouchers-templates/{template}` | Sanctum | admin |
+| POST | `/api/admin/notifications` | Sanctum | admin |
+| GET | `/api/notifications` | Sanctum | - |
+| POST | `/api/notifications/{notification}/read` | Sanctum | - |

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import toast from 'react-hot-toast';
 import {
   Search,
   Loader2,
@@ -12,8 +13,19 @@ import {
   Layers,
   Activity,
   User,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import ErrorDialog from '@/components/shadcn-studio/blocks/dashboard-dialog-22/dialog-error';
+import { Checkbox } from '@/components/ui/checkbox';
+
+const rankColors: Record<string, string> = {
+  bronze: 'text-[#cd7f32] bg-[#cd7f32]/10 border-[#cd7f32]/25',
+  silver: 'text-[#94a3b8] bg-[#94a3b8]/10 border-[#94a3b8]/25',
+  gold: 'text-[#eab308] bg-[#eab308]/10 border-[#eab308]/25',
+  platinum: 'text-[#0ea5e9] bg-[#0ea5e9]/10 border-[#0ea5e9]/25',
+};
 
 interface VouchersViewProps {
   onOpenCreateVoucher: () => void;
@@ -78,8 +90,9 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
     try {
       await api.deleteVoucherTemplate(voucher.id);
       setTemplates((prev) => prev.filter((t) => t.id !== voucher.id));
+      toast.success('Voucher template deleted successfully');
     } catch (err: any) {
-      alert(err.message || 'Failed to delete template');
+      toast.error(err.message || 'Failed to delete template');
     }
   };
 
@@ -99,8 +112,10 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
       await Promise.all(selectedIds.map((id) => api.deleteVoucherTemplate(id)));
       setTemplates((prev) => prev.filter((t) => !selectedIds.includes(t.id)));
       setSelectedIds([]);
+      toast.success('Selected templates deleted successfully');
     } catch (err: any) {
       setError(err.message || 'Failed to delete selected templates');
+      toast.error(err.message || 'Failed to delete selected templates');
     } finally {
       setBulkDeleting(false);
     }
@@ -118,6 +133,22 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
       h.voucher_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (h.user?.name || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
+  const currentList = activeSubTab === 'templates' ? filteredTemplates : filteredHistory;
+  const totalItems = currentList.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  
+  const paginatedTemplates = filteredTemplates.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedHistory = filteredHistory.slice(startIndex, startIndex + itemsPerPage);
+
+  // Reset to page 1 on filter/tab changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, activeSubTab]);
 
   return (
     <div className="space-y-6">
@@ -248,8 +279,8 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
         displayMode === 'cards' ? (
           /* Voucher Templates grid */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filteredTemplates.length > 0 ? (
-              filteredTemplates.map((v) => {
+            {paginatedTemplates.length > 0 ? (
+              paginatedTemplates.map((v) => {
                 const formattedMinTx = v.min_transaction ? `Min. Spend: Rp ${Number(v.min_transaction).toLocaleString()}` : 'No Min. Spend';
                 const formattedMax = v.max_discount ? `Max. Cap: Rp ${Number(v.max_discount).toLocaleString()}` : 'Unlimited Cap';
                 const discountValueStr = v.discount_type === 'percentage' 
@@ -301,6 +332,17 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
                           <User className="h-3.5 w-3.5 text-muted-foreground" />
                           <span>Limit/Cust: {v.max_uses_per_user ? `${v.max_uses_per_user} time(s)` : 'Unlimited'}</span>
                         </div>
+                        {v.min_rank && (
+                          <div className="flex items-center space-x-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-shield-alert shrink-0 text-muted-foreground"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            <span className="text-[11px] font-semibold text-muted-foreground">Min Rank:</span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border capitalize ${
+                              rankColors[v.min_rank.toLowerCase()] || 'text-muted-foreground bg-muted border-border'
+                            }`}>
+                              {v.min_rank}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -346,24 +388,25 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
                 <thead>
                   <tr className="border-b border-border bg-muted/40 text-muted-foreground text-xs uppercase tracking-wider">
                     <th className="p-4 w-12 text-center">
-                      <input
-                        type="checkbox"
-                        checked={filteredTemplates.length > 0 && selectedIds.length === filteredTemplates.length}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedIds(filteredTemplates.map((v) => v.id));
-                          } else {
-                            setSelectedIds([]);
-                          }
-                        }}
-                        className="rounded border-border text-primary cursor-pointer h-4 w-4 focus:ring-ring bg-background"
-                      />
+                      <div className="flex justify-center">
+                        <Checkbox
+                          checked={filteredTemplates.length > 0 && selectedIds.length === filteredTemplates.length}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedIds(filteredTemplates.map((v) => v.id));
+                            } else {
+                              setSelectedIds([]);
+                            }
+                          }}
+                        />
+                      </div>
                     </th>
                     <th className="p-4">Voucher Name</th>
                     <th className="p-4">Code</th>
                     <th className="p-4">Discount</th>
                     <th className="p-4">Min. Spend / Cap</th>
                     <th className="p-4">Points Cost</th>
+                    <th className="p-4">Min. Rank</th>
                     <th className="p-4">Limit/Cust</th>
                     <th className="p-4">Validity</th>
                     <th className="p-4">Status</th>
@@ -371,8 +414,8 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filteredTemplates.length > 0 ? (
-                    filteredTemplates.map((v) => {
+                  {paginatedTemplates.length > 0 ? (
+                    paginatedTemplates.map((v) => {
                       const formattedMinTx = v.min_transaction ? `Min: Rp ${Number(v.min_transaction).toLocaleString()}` : 'No Min';
                       const formattedMax = v.max_discount ? `Cap: Rp ${Number(v.max_discount).toLocaleString()}` : 'No Cap';
                       const discountValueStr = v.discount_type === 'percentage' 
@@ -391,18 +434,18 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
                           }`}
                         >
                           <td className="p-4 w-12 text-center">
-                            <input
-                              type="checkbox"
-                              checked={selectedIds.includes(v.id)}
-                              onChange={() => {
-                                setSelectedIds((prev) =>
-                                  prev.includes(v.id)
-                                    ? prev.filter((id) => id !== v.id)
-                                    : [...prev, v.id]
-                                );
-                              }}
-                              className="rounded border-border text-primary cursor-pointer h-4 w-4 focus:ring-ring bg-background"
-                            />
+                            <div className="flex justify-center">
+                              <Checkbox
+                                checked={selectedIds.includes(v.id)}
+                                onCheckedChange={(checked) => {
+                                  setSelectedIds((prev) =>
+                                    checked
+                                      ? [...prev, v.id]
+                                      : prev.filter((id) => id !== v.id)
+                                  );
+                                }}
+                              />
+                            </div>
                           </td>
                           <td className="p-4 font-semibold text-sm">
                             {v.name}
@@ -421,6 +464,17 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
                           </td>
                           <td className="p-4 font-semibold text-emerald-500 text-xs">
                             {v.points_cost} pts
+                          </td>
+                          <td className="p-4">
+                            {v.min_rank ? (
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border capitalize ${
+                                rankColors[v.min_rank.toLowerCase()] || 'text-muted-foreground bg-muted border-border'
+                              }`}>
+                                {v.min_rank}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">-</span>
+                            )}
                           </td>
                           <td className="p-4 text-xs text-foreground">
                             {v.max_uses_per_user ? `${v.max_uses_per_user}x` : 'Unlimited'}
@@ -495,8 +549,8 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredHistory.length > 0 ? (
-                  filteredHistory.map((h) => (
+                {paginatedHistory.length > 0 ? (
+                  paginatedHistory.map((h) => (
                     <tr key={h.id} className="hover:bg-accent/25 text-foreground transition-all">
                       <td className="p-4 font-mono font-bold text-primary tracking-wide">
                         {h.voucher_code}
@@ -547,6 +601,80 @@ export function VouchersView({ onOpenCreateVoucher, onOpenEditVoucher }: Voucher
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between border-t border-border pt-4 mt-4 bg-card px-4 py-3 rounded-xl shadow-xs">
+          <div className="flex flex-1 justify-between sm:hidden">
+            <Button
+              variant="outline"
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="cursor-pointer"
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="cursor-pointer"
+            >
+              Next
+            </Button>
+          </div>
+          <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground">
+                Showing <span className="font-semibold text-foreground">{startIndex + 1}</span> to{' '}
+                <span className="font-semibold text-foreground">
+                  {Math.min(startIndex + itemsPerPage, totalItems)}
+                </span>{' '}
+                of <span className="font-semibold text-foreground">{totalItems}</span> results
+              </p>
+            </div>
+            <div>
+              <nav className="isolate inline-flex -space-x-px rounded-md shadow-xs" aria-label="Pagination">
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="relative inline-flex items-center rounded-l-md px-2.5 py-2 text-muted-foreground ring-1 ring-inset ring-border hover:bg-accent focus:z-20 focus:outline-offset-0 disabled:opacity-40 cursor-pointer text-xs"
+                >
+                  <ChevronLeft className="h-4.5 w-4.5" />
+                </button>
+                {(() => {
+                  const maxButtons = 5;
+                  let start = Math.max(1, currentPage - 2);
+                  let end = Math.min(totalPages, start + maxButtons - 1);
+                  if (end - start + 1 < maxButtons) {
+                    start = Math.max(1, end - maxButtons + 1);
+                  }
+                  return Array.from({ length: end - start + 1 }, (_, idx) => start + idx);
+                })().map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`relative inline-flex items-center px-3.5 py-2 text-xs font-semibold ring-1 ring-inset ring-border focus:z-20 cursor-pointer ${
+                      currentPage === page
+                        ? 'z-10 bg-primary text-primary-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
+                        : 'text-foreground hover:bg-accent'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="relative inline-flex items-center rounded-r-md px-2.5 py-2 text-muted-foreground ring-1 ring-inset ring-border hover:bg-accent focus:z-20 focus:outline-offset-0 disabled:opacity-40 cursor-pointer text-xs"
+                >
+                  <ChevronRight className="h-4.5 w-4.5" />
+                </button>
+              </nav>
+            </div>
           </div>
         </div>
       )}

@@ -25,8 +25,8 @@ class TransactionRequest extends FormRequest
             'customer_id' => ['required', 'exists:customers,id'],
             'service_id' => ['required', 'exists:services,id'],
             'weight' => ['required', 'numeric', 'min:0.1'],
-            'payment_method' => ['required_if:payment_status,paid', 'nullable', 'in:cash,transfer,qris'],
-            'payment_status' => ['required', 'in:pending,paid'],
+            'payment_method' => ['required_if:payment_status,paid,pending_confirmation', 'nullable', 'in:cash,transfer,qris'],
+            'payment_status' => ['required', 'in:pending,pending_confirmation,paid'],
             'payment_proof' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
             'voucher_code' => ['nullable', 'string'],
         ];

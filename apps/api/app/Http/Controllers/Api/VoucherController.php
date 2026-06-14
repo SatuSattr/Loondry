@@ -23,6 +23,18 @@ class VoucherController extends Controller
         }
         
         $vouchers = $query->latest()->get();
+
+        // Append user redemption count if user is authenticated
+        $user = $request->user();
+        if ($user) {
+            $vouchers->each(function ($voucher) use ($user) {
+                $count = PointsRedemption::where('user_id', $user->id)
+                    ->where('voucher_id', $voucher->id)
+                    ->count();
+                $voucher->setAttribute('user_redemptions_count', $count);
+            });
+        }
+        
         return response()->json(['data' => $vouchers]);
     }
 
@@ -44,6 +56,7 @@ class VoucherController extends Controller
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'status' => ['nullable', 'string', 'in:active,inactive'],
+            'min_rank' => ['nullable', 'string', 'in:bronze,silver,gold,platinum'],
         ]);
 
         $voucher = Voucher::create($validated);
@@ -80,6 +93,7 @@ class VoucherController extends Controller
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'status' => ['nullable', 'string', 'in:active,inactive'],
+            'min_rank' => ['nullable', 'string', 'in:bronze,silver,gold,platinum'],
         ]);
 
         $voucher->update($validated);
@@ -141,6 +155,16 @@ class VoucherController extends Controller
             return response()->json(['message' => 'Voucher is not active'], 400);
         }
 
+        // Validate rank requirement if set
+        if ($voucher->min_rank) {
+            $customerRank = self::getRank($targetUser->points);
+            if (self::getRankWeight($customerRank) < self::getRankWeight($voucher->min_rank)) {
+                return response()->json([
+                    'message' => 'Your rank (' . ucfirst($customerRank) . ') is insufficient. This voucher requires ' . ucfirst($voucher->min_rank) . ' rank.'
+                ], 400);
+            }
+        }
+
         // Validate date validity
         $today = now()->startOfDay();
         if ($voucher->start_date && $today->lt($voucher->start_date)) {
@@ -160,7 +184,9 @@ class VoucherController extends Controller
             }
         }
 
-        $voucherCode = strtoupper($voucher->code . '-' . $targetUser->id . '-' . Str::random(6));
+        do {
+            $voucherCode = strtoupper(Str::random(6));
+        } while (PointsRedemption::where('voucher_code', $voucherCode)->exists());
 
         try {
             $redemption = DB::transaction(function () use ($targetUser, $voucher, $voucherCode) {
@@ -298,5 +324,24 @@ class VoucherController extends Controller
                 'message' => $e->getMessage(),
             ], 422);
         }
+    }
+
+    /**
+     * Get rank name based on user points.
+     */
+    public static function getRank($points): string
+    {
+        if ($points >= 1000) return 'platinum';
+        if ($points >= 500) return 'gold';
+        if ($points >= 200) return 'silver';
+        return 'bronze';
+    }
+
+    /**
+     * Get numeric weight for a rank.
+     */
+    public static function getRankWeight($rank): int
+    {
+        return ['bronze' => 0, 'silver' => 1, 'gold' => 2, 'platinum' => 3][strtolower($rank)] ?? 0;
     }
 }

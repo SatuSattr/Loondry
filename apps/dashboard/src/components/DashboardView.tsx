@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Calendar as CalendarIcon,
   Keyboard,
+  Bell,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -31,9 +32,10 @@ interface DashboardViewProps {
   onOpenCreateOrder: () => void;
   onOpenCreateCustomer: () => void;
   onOpenShortcuts: () => void;
+  onOpenSendNotification: () => void;
 }
 
-export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer, onOpenShortcuts }: DashboardViewProps) {
+export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer, onOpenShortcuts, onOpenSendNotification }: DashboardViewProps) {
   const [revenueRange, setRevenueRange] = useState('all');
   const [data, setData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
@@ -161,6 +163,13 @@ export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer, onOpenS
             title="Refresh dashboard stats"
           >
             <RefreshCw className="h-4 w-4" />
+          </button>
+          <button
+            onClick={onOpenSendNotification}
+            className="border border-border bg-background hover:bg-accent text-foreground px-4 py-2 rounded-lg font-medium text-sm flex items-center space-x-1.5 transition-colors cursor-pointer"
+          >
+            <Bell className="h-4 w-4" />
+            <span>Send Notification</span>
           </button>
           <button
             onClick={onOpenCreateOrder}

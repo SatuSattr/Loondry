@@ -170,9 +170,9 @@ class TransactionController extends Controller
             ], 422);
         }
 
-        if ($request->status === 'diambil' && $transaction->payment_status === 'pending') {
+        if ($request->status === 'diambil' && $transaction->payment_status !== 'paid') {
             return response()->json([
-                'message' => 'The transaction cannot be completed because payment is still pending. Please process the payment first.',
+                'message' => 'The transaction cannot be completed because payment is not completed. Please approve/process the payment first.',
             ], 422);
         }
 
@@ -181,6 +181,35 @@ class TransactionController extends Controller
                 $transaction->update(['status' => $request->status]);
                 $transaction->logs()->create(['status' => $request->status]);
             });
+
+            if ($request->status === 'siap diambil') {
+                $customer = $transaction->customer;
+                if ($customer && $customer->user_id) {
+                    $service = $transaction->service;
+                    $serviceName = $service ? $service->service_name : 'Layanan';
+                    $unit = $service ? $service->unit : 'Kg';
+                    $title = 'Pesanan Siap Diambil!';
+                    $content = sprintf(
+                        'Pesanan %s %g %s dengan kode %s sudah siap diambil!',
+                        $serviceName,
+                        (float)$transaction->weight,
+                        $unit,
+                        $transaction->invoice_code
+                    );
+
+                    \App\Models\Notification::create([
+                        'user_id' => $customer->user_id,
+                        'title' => $title,
+                        'content' => $content,
+                        'is_read' => false,
+                    ]);
+
+                    $customerUser = $customer->user;
+                    if ($customerUser && $customerUser->device_token) {
+                        \App\Services\ExpoPushService::send($customerUser->device_token, $title, $content);
+                    }
+                }
+            }
         }
 
         return response()->json([
@@ -195,20 +224,57 @@ class TransactionController extends Controller
     public function uploadConditionImages(Request $request, Transaction $transaction)
     {
         $request->validate([
-            'images' => ['required', 'array'],
+            'image_before' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:5120'],
+            'image_after' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:5120'],
+            'images' => ['nullable', 'array'],
             'images.*' => ['image', 'mimes:jpg,jpeg,png', 'max:5120'],
         ]);
 
         $uploadedImages = [];
-        foreach ($request->file('images') as $image) {
-            $path = $image->store('transaction_conditions', 'public');
-            $transactionImage = $transaction->images()->create(['image_path' => $path]);
-            $uploadedImages[] = $transactionImage;
+
+        if ($request->hasFile('image_before')) {
+            // Delete old file from storage if it exists
+            $oldBefore = $transaction->images()->where('type', 'before')->first();
+            if ($oldBefore) {
+                Storage::disk('public')->delete($oldBefore->image_path);
+                $oldBefore->delete();
+            }
+
+            $path = $request->file('image_before')->store('transaction_conditions', 'public');
+            $uploadedImages[] = $transaction->images()->create([
+                'image_path' => $path,
+                'type' => 'before'
+            ]);
+        }
+
+        if ($request->hasFile('image_after')) {
+            // Delete old file from storage if it exists
+            $oldAfter = $transaction->images()->where('type', 'after')->first();
+            if ($oldAfter) {
+                Storage::disk('public')->delete($oldAfter->image_path);
+                $oldAfter->delete();
+            }
+
+            $path = $request->file('image_after')->store('transaction_conditions', 'public');
+            $uploadedImages[] = $transaction->images()->create([
+                'image_path' => $path,
+                'type' => 'after'
+            ]);
+        }
+
+        if ($request->hasFile('images')) {
+            foreach ($request->file('images') as $image) {
+                $path = $image->store('transaction_conditions', 'public');
+                $uploadedImages[] = $transaction->images()->create([
+                    'image_path' => $path,
+                    'type' => 'before'
+                ]);
+            }
         }
 
         return response()->json([
             'message' => 'Condition images uploaded successfully',
-            'data' => $uploadedImages,
+            'data' => $transaction->load('images'),
         ]);
     }
 
@@ -220,6 +286,11 @@ class TransactionController extends Controller
         $this->authorizeTransaction($transaction);
         
         $method = $request->input('payment_method', $transaction->payment_method);
+        $isCustomer = $request->user()->role === 'customer';
+
+        if ($isCustomer && !in_array($method, ['transfer', 'qris'])) {
+            return response()->json(['message' => 'Customers can only choose transfer or qris payment method.'], 422);
+        }
         
         $request->validate([
             'payment_method' => [$transaction->payment_method ? 'nullable' : 'required', 'string', 'in:cash,transfer,qris'],
@@ -264,30 +335,106 @@ class TransactionController extends Controller
             $path = $request->file('payment_proof')->store('payment_proofs', 'public');
         }
 
-        DB::transaction(function () use ($path, $transaction, $discount, $redemption, $points_earned, $request) {
-            $updateData = [
-                'payment_status' => 'paid',
-                'paid_at' => now(),
-                'points_earned' => $points_earned,
-            ];
+        $isCustomer = $request->user()->role === 'customer';
+
+        DB::transaction(function () use ($path, $transaction, $discount, $redemption, $points_earned, $request, $isCustomer) {
+            $updateData = [];
             if ($path !== null) {
                 $updateData['payment_proof'] = $path;
             }
             if ($request->filled('payment_method')) {
                 $updateData['payment_method'] = $request->payment_method;
             }
-            if ($redemption) {
-                $updateData['discount'] = $discount;
-                $updateData['voucher_code'] = $redemption->voucher_code;
-            }
-            $transaction->update($updateData);
 
-            if ($redemption) {
-                $redemption->update([
-                    'is_used' => true,
-                    'used_at' => now(),
-                ]);
+            if ($isCustomer) {
+                // Customer uploading proof: payment becomes pending_confirmation
+                $updateData['payment_status'] = 'pending_confirmation';
+                if ($redemption) {
+                    $updateData['discount'] = $discount;
+                    $updateData['voucher_code'] = $redemption->voucher_code;
+                }
+                $transaction->update($updateData);
+
+                if ($redemption) {
+                    $redemption->update([
+                        'is_used' => true,
+                        'used_at' => now(),
+                    ]);
+                }
+            } else {
+                // Admin paying/confirming: mark paid immediately
+                $updateData['payment_status'] = 'paid';
+                $updateData['paid_at'] = now();
+                $updateData['points_earned'] = $points_earned;
+                if ($redemption) {
+                    $updateData['discount'] = $discount;
+                    $updateData['voucher_code'] = $redemption->voucher_code;
+                }
+                $transaction->update($updateData);
+
+                if ($redemption) {
+                    $redemption->update([
+                        'is_used' => true,
+                        'used_at' => now(),
+                    ]);
+                }
+
+                $customerUser = $transaction->customer->user;
+                $customerUser->increment('points', $points_earned);
             }
+        });
+
+        $transaction->load(['customer.user', 'admin', 'service']);
+
+        if (!$isCustomer) {
+            try {
+                $pdf = Pdf::loadView('pdf.receipt', ['transaction' => $transaction]);
+                $pdfContent = $pdf->output();
+                Mail::to($transaction->customer->user->email)->send(new TransactionReceiptMail($transaction, $pdfContent));
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning('Receipt email failed: ' . $e->getMessage());
+            }
+        }
+
+        $msg = $isCustomer
+            ? 'Payment proof submitted successfully and is pending admin review.'
+            : ($transaction->payment_method === 'cash'
+                ? 'Cash payment confirmed, points awarded, and receipt sent to email successfully'
+                : 'Payment proof uploaded, points awarded, and receipt sent to email successfully');
+
+        return response()->json([
+            'message' => $msg,
+            'data' => $transaction,
+        ]);
+    }
+
+    /**
+     * Approve a customer's uploaded payment proof.
+     */
+    public function approvePayment(Request $request, Transaction $transaction)
+    {
+        $user = $request->user();
+        if ($user->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Only admins can approve payments.'], 403);
+        }
+
+        if ($transaction->payment_status === 'paid') {
+            return response()->json(['message' => 'Transaction is already paid.'], 422);
+        }
+
+        if (!$transaction->payment_proof) {
+            return response()->json(['message' => 'Cannot approve. No payment proof uploaded yet.'], 422);
+        }
+
+        $actual_paid = max(0, $transaction->total_price - ($transaction->discount ?: 0));
+        $points_earned = intdiv($actual_paid, config('points.earn_per')) * config('points.earn_rate');
+
+        DB::transaction(function () use ($transaction, $points_earned) {
+            $transaction->update([
+                'payment_status' => 'paid',
+                'paid_at' => now(),
+                'points_earned' => $points_earned,
+            ]);
 
             $customerUser = $transaction->customer->user;
             $customerUser->increment('points', $points_earned);
@@ -303,13 +450,102 @@ class TransactionController extends Controller
             \Illuminate\Support\Facades\Log::warning('Receipt email failed: ' . $e->getMessage());
         }
 
-        $msg = $transaction->payment_method === 'cash'
-            ? 'Cash payment confirmed, points awarded, and receipt sent to email successfully'
-            : 'Payment proof uploaded, points awarded, and receipt sent to email successfully';
+        return response()->json([
+            'message' => 'Payment approved successfully',
+            'data' => $transaction,
+        ]);
+    }
+
+    /**
+     * Reject a customer's uploaded payment proof.
+     */
+    public function rejectPayment(Request $request, Transaction $transaction)
+    {
+        $user = $request->user();
+        if ($user->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Only admins can reject payments.'], 403);
+        }
+
+        if ($transaction->payment_status === 'paid') {
+            return response()->json(['message' => 'Cannot reject a paid transaction.'], 422);
+        }
+
+        // Delete proof file from storage
+        if ($transaction->payment_proof) {
+            Storage::disk('public')->delete($transaction->payment_proof);
+        }
+
+        // If a voucher was applied, we un-use the redemption
+        if ($transaction->voucher_code) {
+            $redemption = PointsRedemption::where('voucher_code', $transaction->voucher_code)->first();
+            if ($redemption) {
+                // Refund points to user
+                $customerUser = $transaction->customer->user;
+                $customerUser->increment('points', $redemption->points_spent);
+
+                $redemption->update([
+                    'is_used' => false,
+                    'used_at' => null,
+                ]);
+            }
+        }
+
+        $transaction->update([
+            'payment_status' => 'pending',
+            'payment_proof' => null,
+            'payment_method' => null,
+            'discount' => 0,
+            'voucher_code' => null,
+        ]);
 
         return response()->json([
-            'message' => $msg,
-            'data' => $transaction,
+            'message' => 'Payment proof rejected and removed successfully',
+            'data' => $transaction->load(['customer.user', 'admin', 'service']),
+        ]);
+    }
+
+    /**
+     * Cancel a customer's pending payment confirmation.
+     */
+    public function cancelPayment(Request $request, Transaction $transaction)
+    {
+        $this->authorizeTransaction($transaction);
+
+        if ($transaction->payment_status !== 'pending_confirmation') {
+            return response()->json(['message' => 'Cannot cancel. Payment is not pending confirmation.'], 422);
+        }
+
+        // Delete proof file from storage
+        if ($transaction->payment_proof) {
+            Storage::disk('public')->delete($transaction->payment_proof);
+        }
+
+        // If a voucher was applied, we un-use the redemption
+        if ($transaction->voucher_code) {
+            $redemption = PointsRedemption::where('voucher_code', $transaction->voucher_code)->first();
+            if ($redemption) {
+                // Refund points to user
+                $customerUser = $transaction->customer->user;
+                $customerUser->increment('points', $redemption->points_spent);
+
+                $redemption->update([
+                    'is_used' => false,
+                    'used_at' => null,
+                ]);
+            }
+        }
+
+        $transaction->update([
+            'payment_status' => 'pending',
+            'payment_proof' => null,
+            'payment_method' => null,
+            'discount' => 0,
+            'voucher_code' => null,
+        ]);
+
+        return response()->json([
+            'message' => 'Payment confirmation canceled successfully',
+            'data' => $transaction->load(['customer.user', 'admin', 'service']),
         ]);
     }
 

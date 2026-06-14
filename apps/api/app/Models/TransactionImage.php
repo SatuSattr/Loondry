@@ -10,7 +10,7 @@ class TransactionImage extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['transaction_id', 'image_path'];
+    protected $fillable = ['transaction_id', 'image_path', 'type'];
 
     public function transaction(): BelongsTo
     {

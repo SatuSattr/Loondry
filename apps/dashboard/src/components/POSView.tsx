@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, getAuthToken, API_BASE } from '../lib/api';
-import { Search, Loader2, CreditCard, Ticket, Printer, RefreshCw, SlidersHorizontal, X, ChevronDown, Camera } from 'lucide-react';
+import { Search, Loader2, CreditCard, Printer, RefreshCw, SlidersHorizontal, X, ChevronDown, Camera, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -12,11 +12,11 @@ import ErrorDialog from './shadcn-studio/blocks/dashboard-dialog-22/dialog-error
 
 interface POSViewProps {
   onOpenCreateOrder: () => void;
-  onOpenApplyVoucher: (tx: any) => void;
   onOpenPaymentProof: (tx: any) => void;
+  onOpenOrderPhotos: (tx: any) => void;
 }
 
-export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentProof }: POSViewProps) {
+export function POSView({ onOpenCreateOrder, onOpenPaymentProof, onOpenOrderPhotos }: POSViewProps) {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -39,27 +39,13 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
   const paymentLabels: Record<string, string> = {
     all: 'All Payments',
     pending: 'Pending',
+    pending_confirmation: 'Pending Confirmation',
     paid: 'Paid',
   };
 
   // Action loading states
   const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null);
   const [printingId, setPrintingId] = useState<number | null>(null);
-  const [uploadingConditionId, setUploadingConditionId] = useState<number | null>(null);
-
-  const handleUploadConditionFile = async (id: number, file: File) => {
-    try {
-      await api.uploadConditionImages(id, file);
-      // reload transactions so the new image path is loaded
-      const res = await api.getTransactions();
-      setTransactions(res.data || []);
-      alert('Clothes condition photo uploaded successfully!');
-    } catch (err: any) {
-      alert(err.message || 'Failed to upload clothes condition photo');
-    } finally {
-      setUploadingConditionId(null);
-    }
-  };
 
   const loadTransactions = async () => {
     setLoading(true);
@@ -120,19 +106,25 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
 
       const blob = await response.blob();
       const fileUrl = window.URL.createObjectURL(blob);
+      
+      // Remove any existing print iframes to avoid cluttering DOM
+      const existing = document.getElementById('lnd-print-iframe');
+      if (existing) {
+        existing.remove();
+      }
+
       const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
+      iframe.id = 'lnd-print-iframe';
+      iframe.style.position = 'fixed';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = 'none';
       iframe.src = fileUrl;
       document.body.appendChild(iframe);
       
       iframe.onload = () => {
         iframe.contentWindow?.focus();
         iframe.contentWindow?.print();
-        // clean up
-        setTimeout(() => {
-          document.body.removeChild(iframe);
-          window.URL.revokeObjectURL(fileUrl);
-        }, 1000);
       };
     } catch (err: any) {
       alert(err.message || 'Failed to print receipt. Opening alternative web view...');
@@ -154,6 +146,29 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
 
     return matchesSearch && matchesStatus && matchesPayment;
   });
+
+  // Sort State
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+
+  // Sort logic
+  const sortedTransactions = [...filteredTransactions].sort((a, b) => {
+    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+  });
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
+  const totalItems = sortedTransactions.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedTransactions = sortedTransactions.slice(startIndex, startIndex + itemsPerPage);
+
+  // Reset to page 1 on filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, paymentFilter, sortOrder]);
 
   return (
     <div className="space-y-6">
@@ -243,22 +258,31 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Clear Filters */}
-          {(statusFilter !== 'all' || paymentFilter !== 'all') && (
-            <Button
-              variant="ghost"
-              size="lg"
-              onClick={() => {
-                setStatusFilter('all');
-                setPaymentFilter('all');
-              }}
-              className="px-2.5 text-muted-foreground hover:text-foreground hover:bg-accent/50 cursor-pointer text-xs"
-              title="Clear all filters"
-            >
-              <X className="h-4 w-4 mr-1 text-muted-foreground" />
-              Clear
-            </Button>
-          )}
+          {/* Sort Order Filter */}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button variant="outline" size="lg" className="gap-1.5 cursor-pointer text-xs font-semibold text-foreground">
+                  <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>Sort: {sortOrder === 'newest' ? 'Newest' : 'Oldest'}</span>
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end" className="w-40 bg-card border border-border text-foreground">
+              <DropdownMenuItem
+                onClick={() => setSortOrder('newest')}
+                className="cursor-pointer hover:bg-accent hover:text-accent-foreground text-xs"
+              >
+                Newest First
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setSortOrder('oldest')}
+                className="cursor-pointer hover:bg-accent hover:text-accent-foreground text-xs"
+              >
+                Oldest First
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -293,8 +317,8 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredTransactions.length > 0 ? (
-                  filteredTransactions.map((tx) => {
+                {paginatedTransactions.length > 0 ? (
+                  paginatedTransactions.map((tx) => {
                     const priceRate = Number(tx.service?.price || 0);
                     const weight = Number(tx.weight || 0);
                     const rawTotal = Number(tx.total_price || 0);
@@ -329,17 +353,21 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
                             {weight} {tx.service?.unit} @ Rp {priceRate.toLocaleString()}/{tx.service?.unit}
                           </p>
                           {tx.images && tx.images.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const imgPath = tx.images[0].image_path;
-                                setActiveConditionImage(`${API_BASE}/storage/${imgPath}`);
-                              }}
-                              className="mt-1.5 inline-flex items-center space-x-1 text-xs text-primary hover:text-primary/80 hover:underline cursor-pointer bg-primary/5 dark:bg-primary/10 px-2 py-0.5 rounded-md transition-colors border-none"
-                            >
-                              <Camera className="h-3.5 w-3.5 mr-1" />
-                              <span>View Clothes Condition</span>
-                            </button>
+                            <div className="flex flex-wrap gap-1.5 mt-1.5">
+                              {tx.images.map((img: any) => (
+                                <button
+                                  key={img.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveConditionImage(`${API_BASE}/storage/${img.image_path}`);
+                                  }}
+                                  className="inline-flex items-center text-xs text-primary hover:text-primary/80 hover:underline cursor-pointer bg-primary/5 dark:bg-primary/10 px-2 py-0.5 rounded-md transition-colors border-none capitalize font-medium"
+                                >
+                                  <Camera className="h-3 w-3 mr-1" />
+                                  <span>Foto {img.type}</span>
+                                </button>
+                              ))}
+                            </div>
                           )}
                         </td>
 
@@ -386,7 +414,7 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
                               <DropdownMenuContent className="w-48 bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
                                 {Object.entries(statusLabels)
                                   .filter(([key]) => key !== 'all')
-                                  .filter(([key]) => !(key === 'diambil' && tx.payment_status === 'pending'))
+                                  .filter(([key]) => !(key === 'diambil' && tx.payment_status !== 'paid'))
                                   .map(([key, val]) => (
                                     <DropdownMenuItem
                                       key={key}
@@ -405,13 +433,23 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
 
                         {/* Payment status */}
                         <td className="p-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase ${
-                            tx.payment_status === 'paid'
-                              ? 'bg-emerald-500/10 text-emerald-500'
-                              : 'bg-destructive/10 text-destructive'
-                          }`}>
-                            {tx.payment_status}
-                          </span>
+                          {tx.payment_status === 'paid' ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase bg-emerald-500/10 text-emerald-500">
+                              Paid
+                            </span>
+                          ) : tx.payment_status === 'pending_confirmation' ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
+                              Pending Confirmation
+                            </span>
+                          ) : tx.payment_proof ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
+                              Pending Review
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase bg-destructive/10 text-destructive">
+                              Pending
+                            </span>
+                          )}
                         </td>
 
                         {/* Action buttons */}
@@ -428,21 +466,10 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
                               </button>
                             ) : null}
 
-                            {/* Apply Voucher */}
-                            {tx.payment_status !== 'paid' && !tx.voucher_code && tx.status !== 'diambil' ? (
-                              <button
-                                onClick={() => onOpenApplyVoucher(tx)}
-                                className="p-1.5 rounded-md border border-border bg-background hover:bg-accent text-foreground transition-all cursor-pointer"
-                                title="Apply Loyalty Voucher"
-                              >
-                                <Ticket className="h-4 w-4" />
-                              </button>
-                            ) : null}
-
                             {/* Print Receipt */}
                             <button
-                              disabled={printingId === tx.id}
                               onClick={() => handlePrintReceipt(tx)}
+                              disabled={printingId !== null}
                               className="p-1.5 rounded-md border border-border bg-background hover:bg-accent text-foreground transition-all cursor-pointer disabled:opacity-50"
                               title="Print Invoice / Receipt"
                             >
@@ -455,19 +482,11 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
 
                             {/* Upload Condition Image */}
                             <button
-                              disabled={uploadingConditionId !== null}
-                              onClick={() => {
-                                setUploadingConditionId(tx.id);
-                                document.getElementById('condition-image-upload-input')?.click();
-                              }}
-                              className="p-1.5 rounded-md border border-border bg-background hover:bg-accent text-foreground transition-all cursor-pointer disabled:opacity-50"
-                              title="Upload Clothes Condition Photo"
+                              onClick={() => onOpenOrderPhotos(tx)}
+                              className="p-1.5 rounded-md border border-border bg-background hover:bg-accent text-foreground transition-all cursor-pointer"
+                              title="Upload Clothes Condition Photos"
                             >
-                              {uploadingConditionId === tx.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Camera className="h-4 w-4" />
-                              )}
+                              <Camera className="h-4 w-4" />
                             </button>
                           </div>
                         </td>
@@ -483,6 +502,80 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between border-t border-border pt-4 mt-4 bg-card px-4 py-3 rounded-xl shadow-xs">
+          <div className="flex flex-1 justify-between sm:hidden">
+            <Button
+              variant="outline"
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="cursor-pointer"
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="cursor-pointer"
+            >
+              Next
+            </Button>
+          </div>
+          <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground">
+                Showing <span className="font-semibold text-foreground">{startIndex + 1}</span> to{' '}
+                <span className="font-semibold text-foreground">
+                  {Math.min(startIndex + itemsPerPage, totalItems)}
+                </span>{' '}
+                of <span className="font-semibold text-foreground">{totalItems}</span> results
+              </p>
+            </div>
+            <div>
+              <nav className="isolate inline-flex -space-x-px rounded-md shadow-xs" aria-label="Pagination">
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="relative inline-flex items-center rounded-l-md px-2.5 py-2 text-muted-foreground ring-1 ring-inset ring-border hover:bg-accent focus:z-20 focus:outline-offset-0 disabled:opacity-40 cursor-pointer text-xs"
+                >
+                  <ChevronLeft className="h-4.5 w-4.5" />
+                </button>
+                {(() => {
+                  const maxButtons = 5;
+                  let start = Math.max(1, currentPage - 2);
+                  let end = Math.min(totalPages, start + maxButtons - 1);
+                  if (end - start + 1 < maxButtons) {
+                    start = Math.max(1, end - maxButtons + 1);
+                  }
+                  return Array.from({ length: end - start + 1 }, (_, idx) => start + idx);
+                })().map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`relative inline-flex items-center px-3.5 py-2 text-xs font-semibold ring-1 ring-inset ring-border focus:z-20 cursor-pointer ${
+                      currentPage === page
+                        ? 'z-10 bg-primary text-primary-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
+                        : 'text-foreground hover:bg-accent'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="relative inline-flex items-center rounded-r-md px-2.5 py-2 text-muted-foreground ring-1 ring-inset ring-border hover:bg-accent focus:z-20 focus:outline-offset-0 disabled:opacity-40 cursor-pointer text-xs"
+                >
+                  <ChevronRight className="h-4.5 w-4.5" />
+                </button>
+              </nav>
+            </div>
           </div>
         </div>
       )}
@@ -510,21 +603,7 @@ export function POSView({ onOpenCreateOrder, onOpenApplyVoucher, onOpenPaymentPr
         </div>
       )}
 
-      <input
-        type="file"
-        id="condition-image-upload-input"
-        accept="image/jpeg,image/png,image/jpg"
-        className="hidden"
-        onChange={async (e) => {
-          const file = e.target.files?.[0];
-          if (file && uploadingConditionId) {
-            await handleUploadConditionFile(uploadingConditionId, file);
-            e.target.value = '';
-          } else {
-            setUploadingConditionId(null);
-          }
-        }}
-      />
+
 
       {confirmingTxId !== null && (
         <ErrorDialog

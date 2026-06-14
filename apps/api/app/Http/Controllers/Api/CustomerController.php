@@ -126,11 +126,44 @@ class CustomerController extends Controller
         DB::transaction(function () use ($customer) {
             $user = $customer->user;
             $customer->delete();
-            $user->delete();
+            if ($user) {
+                if ($user->avatar) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->delete($user->avatar);
+                }
+                $user->delete();
+            }
         });
 
         return response()->json([
             'message' => 'Customer deleted successfully',
+        ]);
+    }
+
+    /**
+     * Upload an avatar for a customer.
+     */
+    public function uploadAvatar(Request $request, Customer $customer)
+    {
+        $request->validate([
+            'avatar' => ['required', 'image', 'max:2048'],
+        ]);
+
+        $user = $customer->user;
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        if ($user->avatar) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($user->avatar);
+        }
+
+        $path = $request->file('avatar')->store('avatars', 'public');
+        $user->update(['avatar' => $path]);
+
+        return response()->json([
+            'message' => 'Customer avatar updated successfully',
+            'avatar_url' => $user->avatar_url,
+            'data' => $customer->load('user'),
         ]);
     }
 }

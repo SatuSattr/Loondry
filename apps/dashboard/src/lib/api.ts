@@ -98,6 +98,13 @@ export const api = {
   login: (credentials: any) => request('/login', { method: 'POST', body: credentials }),
   logout: () => request('/logout', { method: 'POST' }),
   getProfile: () => request('/profile'),
+  updateProfile: (data: any) => request('/profile', { method: 'PUT', body: data }),
+  updatePassword: (data: any) => request('/profile/password', { method: 'PUT', body: data }),
+  updateAvatar: (file: File) => {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    return request('/profile/avatar', { method: 'POST', body: formData });
+  },
   
   // Dashboard
   getDashboard: (revenueRange?: string, startDate?: string, endDate?: string) => {
@@ -114,6 +121,11 @@ export const api = {
   createCustomer: (data: any) => request('/customers', { method: 'POST', body: data }),
   updateCustomer: (id: number, data: any) => request(`/customers/${id}`, { method: 'PUT', body: data }),
   deleteCustomer: (id: number) => request(`/customers/${id}`, { method: 'DELETE' }),
+  updateCustomerAvatar: (id: number, file: File) => {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    return request(`/customers/${id}/avatar`, { method: 'POST', body: formData });
+  },
 
   // Services
   getServices: () => request('/services'),
@@ -153,6 +165,9 @@ export const api = {
     });
   },
 
+  approvePayment: (id: number) => request(`/transactions/${id}/approve-payment`, { method: 'POST' }),
+  rejectPayment: (id: number) => request(`/transactions/${id}/reject-payment`, { method: 'POST' }),
+
   checkVoucherCode: (voucherCode: string, totalPrice: number, customerId: number) =>
     request(`/vouchers/check/${encodeURIComponent(voucherCode)}?total_price=${totalPrice}&customer_id=${customerId}`),
 
@@ -170,4 +185,7 @@ export const api = {
   // Reports
   getRevenueReport: () => request('/reports/revenue'),
   getStatisticsReport: () => request('/reports/statistics'),
+
+  // Notifications
+  sendTargetedNotification: (data: any) => request('/admin/notifications', { method: 'POST', body: data }),
 };

@@ -18,87 +18,62 @@ This is a monorepo located at `F:/.RyanN/Loondry` containing:
    - State & API fetching: Managed through a helper client class `api` in `apps/dashboard/src/lib/api.ts`.
    
 3. **`apps/mobile` (Mobile Workspace)**:
-   - Mobile application files.
+   - Core Stack: **React Native (Expo)**, **TypeScript**, **AsyncStorage**, **Ionicons**.
+   - Navigation: Custom screen-state controller rendering views dynamically inside [App.tsx](file:///F:/.RyanN/Loondry/apps/mobile/App.tsx).
 
 ---
 
 ## 🏆 Detailed Technical Changes & Fixes in this Session
 
-### 1. Dropdown Layout Shift Bug (Fixed)
-* **Affected Components**:
-  * **Service Selection Dropdown** in `TransactionForm.tsx`
-  * **Gender Selection Dropdown** in `CustomerForm.tsx`
-  * **Unit & Status Dropdown** in `ServiceForm.tsx`
-  * **Discount Type & Status Dropdown** in `VoucherForm.tsx`
-* **Root Cause**:
-  * The custom `<DropdownMenu>` component wraps `@base-ui/react/menu` primitives.
-  * When a menu is toggled open, `@base-ui/react` inserts invisible focus sentinel `<span>` tags (`tabindex="-1"`, `aria-hidden="true"`) to capture and cycle keyboard tab focuses.
-  * In Tailwind CSS, utility spacing classes like `space-y-1` or `space-y-4` compile to direct child sibling margin selectors (e.g. `& > * + * { margin-top: 0.25rem; }`).
-  * Since the `<DropdownMenu>` was placed directly inside containers with `space-y-*` classes, these invisible sentinels became direct siblings of the input/labels, receiving a `margin-top` values (e.g. `0.25rem` or `1.25rem`). This added phantom vertical height to the container flow, translating/pushing down all content below it.
-* **The Solution**:
-  * Wrapped the `<DropdownMenu>` component inside a plain, un-styled `<div>` wrapper in each affected form.
-  * Because the wrapper `<div>` has no `space-y-*` classes, any sentinels injected by `@base-ui/react` inside it are shielded from the sibling margin selectors. The sentinel retains a flat height of `0px` with no margins, preventing any layout shifting or translation.
-* **Updated Files**:
-  * [TransactionForm.tsx](file:///F:/.RyanN/Loondry/apps/dashboard/src/components/TransactionForm.tsx) (Line 322)
-  * [CustomerForm.tsx](file:///F:/.RyanN/Loondry/apps/dashboard/src/components/CustomerForm.tsx) (Line 193)
-  * [ServiceForm.tsx](file:///F:/.RyanN/Loondry/apps/dashboard/src/components/ServiceForm.tsx) (Lines 105, 141)
-  * [VoucherForm.tsx](file:///F:/.RyanN/Loondry/apps/dashboard/src/components/VoucherForm.tsx) (Lines 156, 249)
+### 1. Dashboard Theme Switching & UI Fixes
+* **Bulk-Edit Checkboxes (Theme Reactivity)**:
+  * Removed default native HTML `<input type="checkbox">` elements from all tables (Transaction, Customer, Services, Vouchers).
+  * Replaced them with the theme-reactive custom `Checkbox` component built on `@base-ui/react` primitives.
+  * Checkboxes now react instantly to Light/Dark mode changes rather than remaining statically white in Dark mode.
+* **Scrollbar Gutter Margin Gap (Fixed)**:
+  * Resolved a visual bug where a thin vertical right margin gap was pushed on the right side of the screen globally, changing color with theme switches.
+  * Root cause was `scrollbar-gutter: stable;` defined on the `html` element inside [index.css](file:///F:/.RyanN/Loondry/apps/dashboard/src/index.css#L155). Removing this rule corrected the margin issue without causing layout shifts.
 
-### 2. TypeScript Compilation & Production Build Fixes
-* **Problem**: Unused variables and parameter configurations in `POSView.tsx` were failing the Vite/TypeScript build pipeline:
-  1. `Keyboard` was imported from `'lucide-react'` but never referenced.
-  2. `onOpenShortcuts` prop was declared in the props interface and destructured in `POSView(...)` parameters but never used.
-* **Fix**: Cleaned up the unused variable/import in `POSView.tsx` and removed the unused prop from `src/App.tsx` (shortcuts information is toggled on the main `DashboardView.tsx` header instead of `POSView.tsx` as per the user's requirements).
-* **Updated Files**:
-  * [POSView.tsx](file:///F:/.RyanN/Loondry/apps/dashboard/src/components/POSView.tsx)
-  * [App.tsx](file:///F:/.RyanN/Loondry/apps/dashboard/src/App.tsx)
-* **Result**: Production compilation (`npm run build`) now runs and succeeds flawlessly with zero warnings/errors.
+### 2. Redesigned Mobile Onboarding & Walkthrough Flow
+* **Walkthrough Slides Layout**:
+  * Replaced the generic icon-based onboarding slides with premium high-fidelity photography assets imported via `require(...)`.
+  * **Onboarding Slide Order**:
+    1. **Splash Screen**: Renders the brand logo (`loondry-logo-brand-white.png` / `loondry-logo-brand-colored.png`) and initializes storage settings.
+    2. **Slide #1 - Bersih**: Explains the premium cleaning quality; renders [clean-laundry.jpg](file:///F:/.RyanN/Loondry/apps/mobile/assets/clean-laundry.jpg).
+    3. **Slide #2 - Harum**: Highlights the long-lasting luxurious fragrance; renders [fragrant-laundry.jpg](file:///F:/.RyanN/Loondry/apps/mobile/assets/fragrant-laundry.jpg).
+    4. **Slide #3 - Higienis**: Features steam-iron sanitization; renders [hygienic-laundry.jpg](file:///F:/.RyanN/Loondry/apps/mobile/assets/hygienic-laundry.jpg).
+* **Walkthrough Images Styling**:
+  * Added `walkthroughImage` rules in the stylesheet to dynamically scale the onboarding images (`width: width - 48, height: height * 0.38, borderRadius: 16`) to fit various device sizes correctly.
 
-### 3. Sidebar Form Autofocus on Mount
-* **Implementation**: Standardized immediate focus behavior on the first text/number input element when sidebar forms (such as `TransactionForm`, `CustomerForm`, etc.) mount.
-* **Method**: Uses standard React `useRef` + `useEffect` hook to call `.focus()` on the primary input field component mount.
+### 3. Mobile Login Landing Screen & Slide-Up Drawer Modal
+* **Web Portal Left-Side Aesthetics**:
+  * Copied the dashboard's login background asset [login-bg.jpg](file:///F:/.RyanN/Loondry/apps/mobile/assets/login-bg.jpg) into the mobile app's assets folder.
+  * Configured `<ImageBackground>` with a zinc/navy color overlay `rgba(9, 9, 11, 0.65)` to deliver a high-contrast premium backdrop.
+  * Displays the white brand logo and the exact motto:
+    > **Bersih, Harum, Higienis.**  
+    > *The Premium Laundry Experience, Simplified.*
+  * Added a large primary solid white button **"Masuk Sekarang"** (Log In) at the bottom.
+  * Re-added the floating Theme Switch toggle on the top right.
+* **Credentials Slide-Up Drawer**:
+  * Implemented a slide-up credentials modal drawer using React Native's `<Modal>` (`animationType="slide"`, `transparent={true}`).
+  * Tapping **"Masuk Sekarang"** sets `isLoginDrawerOpen` to `true` and pops up the drawer.
+  * **Outside Click-to-Dismiss**: Tapping the transparent backdrop or the header cross (x) button closes the drawer.
+  * **Keyboard Alignment**: Wrapped inside `<KeyboardAvoidingView>` (`behavior` set conditionally based on platform) to auto-adjust on keyboard display.
+  * **Password Toggle (Eye Icon)**: Added `showPassword` state. Toggling the eye icon (`eye` / `eye-off`) masks or unmasks the password input.
+  * **Error Handling & Navigation**: Displays login errors inside the drawer. On successful login, the drawer closes automatically (`setIsLoginDrawerOpen(false)`) and transitions to the main customer dashboard.
 
-### 4. HTML5 Date Conforming Warning
-* **Problem**: React logged warnings about invalid date formats (e.g. `2008-11-21T00:00:00.000000Z` does not conform to the required HTML5 date input format `"yyyy-MM-dd"`).
-* **Fix**: Formatted all dates retrieved from backend to standard ISO date-only format before feeding them into date inputs:
-  ```typescript
-  birth_date ? birth_date.substring(0, 10) : ''
+### 4. Type Safety & Compilation
+* Ran full diagnostics on the mobile project:
+  ```powershell
+  npx tsc --noEmit
   ```
-
-### 5. Payment Timing & Methods Logic
-* **Logic**: Added a toggle between "Pay Now (Upfront)" and "Pay Later (Upon Pickup)" (Payment Timing) on `TransactionForm.tsx`.
-* **State Behavior**:
-  * If payment timing is **Pay Later (pickup)**, the payment methods selector is hidden, and `payment_status` is sent as `'pending'`. The transaction payload leaves the payment method blank (defaults to null) for checkout.
-  * If payment timing is **Pay Now (upfront)**, the payment method selector is shown (Cash, Transfer, QRIS), and `payment_status` is sent as `'paid'`.
-
-### 6. Clothes Condition Photo Flow
-* **Logic**: Removed the clothes condition photo upload field from the transaction creation wizard (`TransactionForm.tsx`).
-* **Replacement**: Added an action button with a camera icon on each transaction row in the POS Transaction Table. Clicking it prompts the user to select and upload a clothes condition photo for that specific transaction.
-* **Implementation Details**:
-  * Calls backend API endpoint: `api.uploadConditionImages(id, file)`
-  * Reloads transaction table data post-upload to display updated status indicators.
-
-### 7. Voucher Application UI Adjustments
-* **Change**: Changed the voucher code submission button from Indonesian text ("Terapkan") to a checklist icon (`Check` from `'lucide-react'`).
-* **Form Layout Order**: Reordered the sections of `TransactionForm.tsx` to follow this structure:
-  1. Select Customer
-  2. Service Selector
-  3. Weight/Quantity
-  4. Payment Period
-  5. Payment Method
-  6. Voucher Code
-  7. Order Summary
-  8. Action Buttons (Cancel / Create)
-
-### 8. Localization & English Translations
-* **Change**: Standardized UI vocabulary. Translated all remnant Indonesian titles, placeholders, alerts, and badges across frontend components into English.
-
-### 9. Keyboard Shortcuts Sidebar
-* **Feature**: Added a Keyboard icon button (`Keyboard` from `'lucide-react'`) in the `POS Dashboard` header next to the statistics refresh button. Clicking this triggers the `onOpenShortcuts` callback to show a sidebar (`SlideOver`) displaying all available keyboard shortcut instructions.
+* Resolved type errors (e.g. replacing `StyleSheet.absoluteFillObject` with `StyleSheet.absoluteFill`).
+* Verified that both dashboard and mobile build systems now typecheck clean with **zero errors**.
 
 ---
 
 ## 🏃 Commands Reference (Root directory: `F:\.RyanN\Loondry`)
+
 * **Local Dashboard Dev Server**:
   ```powershell
   cd apps/dashboard
@@ -109,7 +84,17 @@ This is a monorepo located at `F:/.RyanN/Loondry` containing:
   cd apps/dashboard
   npm run build
   ```
-* **Laravel API local server (if needed)**:
+* **Start Mobile Expo App**:
+  ```powershell
+  cd apps/mobile
+  npx expo start
+  ```
+* **Run Mobile Typecheck**:
+  ```powershell
+  cd apps/mobile
+  npx tsc --noEmit
+  ```
+* **Laravel API local server**:
   ```powershell
   cd apps/api
   php artisan serve
@@ -123,5 +108,5 @@ This is a monorepo located at `F:/.RyanN/Loondry` containing:
 ---
 
 ## 🔮 Next Agent Focus
-* The dropdown alignment shifts are completely fixed and build/run sequences compile perfectly.
-* Coordinate with the user for any new functional adjustments, styling, or API integration steps.
+* The onboarding walkthrough images, layout, and slide-up login modal drawer are completely functional and typecheck clean.
+* Coordinate with the user for any additional dashboard feature styling or mobile client actions.

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Toaster } from 'react-hot-toast';
 import { api, getAuthToken, setAuthToken, getSavedUser, setSavedUser } from './lib/api';
 import { SlideOver } from './components/SlideOver';
 import NProgress from 'nprogress';
@@ -12,7 +13,7 @@ NProgress.configure({
 import { CustomerForm } from './components/CustomerForm';
 import { ServiceForm } from './components/ServiceForm';
 import { TransactionForm } from './components/TransactionForm';
-import { ApplyVoucherForm } from './components/ApplyVoucherForm';
+import { OrderPhotoForm } from './components/OrderPhotoForm';
 import { PaymentProofForm } from './components/PaymentProofForm';
 import { DashboardView } from './components/DashboardView';
 import { POSView } from './components/POSView';
@@ -20,7 +21,8 @@ import { CustomersView } from './components/CustomersView';
 import { ServicesView } from './components/ServicesView';
 import { VouchersView } from './components/VouchersView';
 import { VoucherForm } from './components/VoucherForm';
-import { RedeemVoucherForm } from './components/RedeemVoucherForm';
+import { ProfileView } from './components/ProfileView';
+import { NotificationsView } from './components/NotificationsView';
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -36,6 +38,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Ticket,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 type SlideOverType =
@@ -44,22 +48,24 @@ type SlideOverType =
   | 'edit-customer'
   | 'create-service'
   | 'edit-service'
-  | 'apply-voucher'
+  | 'order-photos'
   | 'payment-proof'
   | 'create-voucher'
   | 'edit-voucher'
-  | 'redeem-voucher'
   | 'shortcuts-info'
+  | 'send-notification'
   | null;
+
+type TabType = 'dashboard' | 'pos' | 'customers' | 'services' | 'vouchers' | 'profile';
 
 export default function App() {
   const [token, setToken] = useState<string | null>(getAuthToken());
   const [user, setUser] = useState<any>(getSavedUser());
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'pos' | 'customers' | 'services' | 'vouchers'>('dashboard');
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => localStorage.getItem('lnd_sidebar_collapsed') === 'true');
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  const handleTabChange = async (tab: 'dashboard' | 'pos' | 'customers' | 'services' | 'vouchers') => {
+  const handleTabChange = async (tab: TabType) => {
     if (tab === activeTab || isTransitioning) return;
     
     setIsTransitioning(true);
@@ -82,6 +88,9 @@ export default function App() {
         case 'vouchers':
           await api.getVoucherTemplates();
           break;
+        case 'profile':
+          await api.getProfile();
+          break;
       }
       setActiveTab(tab);
     } catch (err) {
@@ -103,6 +112,7 @@ export default function App() {
   // Login Form states
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
 
@@ -120,6 +130,11 @@ export default function App() {
       localStorage.setItem('theme', 'light');
     }
   }, [isDarkMode]);
+
+  // Persist sidebar state
+  useEffect(() => {
+    localStorage.setItem('lnd_sidebar_collapsed', String(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
 
   // Listen for API 401 token expired event
   useEffect(() => {
@@ -277,16 +292,16 @@ export default function App() {
         return 'Add Laundry Service';
       case 'edit-service':
         return 'Edit Service Details';
-      case 'apply-voucher':
-        return 'Apply Customer Voucher';
+      case 'order-photos':
+        return 'Upload Clothes Condition Photos';
       case 'payment-proof':
         return 'Confirm Payment & Points';
       case 'create-voucher':
         return 'Create Voucher Template';
       case 'edit-voucher':
         return 'Edit Voucher Template';
-      case 'redeem-voucher':
-        return 'Redeem Points for Voucher';
+      case 'send-notification':
+        return 'Send Broadcast Notification';
       default:
         return '';
     }
@@ -310,19 +325,20 @@ export default function App() {
             onOpenCreateOrder={() => setSlideOverType('create-order')}
             onOpenCreateCustomer={() => setSlideOverType('create-customer')}
             onOpenShortcuts={() => setSlideOverType('shortcuts-info')}
+            onOpenSendNotification={() => setSlideOverType('send-notification')}
           />
         );
       case 'pos':
         return (
           <POSView
             onOpenCreateOrder={() => setSlideOverType('create-order')}
-            onOpenApplyVoucher={(tx) => {
-              setActiveItem(tx);
-              setSlideOverType('apply-voucher');
-            }}
             onOpenPaymentProof={(tx) => {
               setActiveItem(tx);
               setSlideOverType('payment-proof');
+            }}
+            onOpenOrderPhotos={(tx) => {
+              setActiveItem(tx);
+              setSlideOverType('order-photos');
             }}
           />
         );
@@ -333,10 +349,6 @@ export default function App() {
             onOpenEditCustomer={(customer) => {
               setActiveItem(customer);
               setSlideOverType('edit-customer');
-            }}
-            onOpenRedeemVoucher={(customer) => {
-              setActiveItem(customer);
-              setSlideOverType('redeem-voucher');
             }}
           />
         );
@@ -360,6 +372,8 @@ export default function App() {
             }}
           />
         );
+      case 'profile':
+        return <ProfileView user={user} onProfileUpdated={(updatedUser) => { setUser(updatedUser); setSavedUser(updatedUser); }} />;
     }
   };
 
@@ -374,74 +388,124 @@ export default function App() {
   // Login Page
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden transition-colors duration-300">
-        {/* Soft Background blur gradients */}
-        <div className="absolute top-50% right-50% h-[500px] w-[500px] blur-[120px] bg-gradient-to-bl from-blue-500/20 via-blue-500/15 to-blue-500/5   pointer-events-none" />
-
-        {/* Floating Dark Mode Toggle */}
-        <button
-          onClick={() => setIsDarkMode(!isDarkMode)}
-          className="absolute top-6 right-6 p-2 rounded-lg border border-border bg-card text-foreground hover:bg-accent transition-all duration-300 cursor-pointer shadow-xs"
-        >
-          {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-        </button>
-
-        <div className="w-full max-w-md bg-card border border-border text-foreground  rounded-2xl p-8 z-10 transition-colors duration-300">
-          <div className="text-center space-y-2 mb-8">
-            <img 
-              src={isDarkMode ? "/assets/loondry-logo-brand-white.png" : "/assets/loondry-logo-brand-colored.png"} 
-              alt="Loondry Logo" 
-              className="h-14 mx-auto mb-4 object-contain"
-            />
-            <p className="text-sm text-muted-foreground">Admin & Operator Portal</p>
+      <div className="min-h-screen grid grid-cols-1 md:grid-cols-2 bg-background relative overflow-hidden transition-colors duration-300">
+        
+        {/* Left Side: Image & Branding (Desktop only) */}
+        <div className="hidden md:block relative overflow-hidden bg-zinc-950">
+          <img
+            src="/assets/login-bg.jpg"
+            alt="Premium Laundry Service"
+            className="absolute inset-0 h-full w-full object-cover opacity-80"
+          />
+          <div className="absolute inset-0 bg-black/50 mix-blend-multiply" />
+          <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/90 via-transparent to-transparent" />
+          
+          <div className="absolute inset-0 flex flex-col justify-between p-12 text-white z-10">
+            <div>
+              <img
+                src="/assets/loondry-logo-brand-white.png"
+                alt="Loondry Logo"
+                className="h-12 object-contain"
+              />
+            </div>
+            <div className="space-y-4">
+              <h2 className="text-4xl font-extrabold tracking-tight leading-tight">
+                Bersih, Harum, Higienis.
+              </h2>
+              <p className="text-lg text-white/80 max-w-md font-medium">
+                The Premium Laundry Experience, Simplified.
+              </p>
+            </div>
+            <div className="text-sm text-white/40">
+              &copy; {new Date().getFullYear()} Loondry. All rights reserved.
+            </div>
           </div>
+        </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            {loginError && (
-              <div className="bg-destructive/10 text-destructive border border-destructive/20 rounded-lg p-3 text-sm font-medium">
-                {loginError}
-              </div>
-            )}
+        {/* Right Side: Login Form */}
+        <div className="flex items-center justify-center p-8 relative overflow-hidden bg-background">
+          {/* Soft Background blur gradients */}
+          {/* <div className="absolute top-50% right-50% h-[500px] w-[500px] blur-[120px] bg-gradient-to-bl from-blue-500/20 via-blue-500/15 to-blue-500/5 pointer-events-none" /> */}
 
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Email Address</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-2.5 h-4.5 w-4.5 text-muted-foreground" />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@loondry.com"
-                  className="w-full bg-background border border-border rounded-lg pl-10 pr-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground"
-                />
-              </div>
+          {/* Floating Dark Mode Toggle */}
+          <button
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            className="absolute top-6 right-6 p-2 rounded-lg border border-border bg-card text-foreground hover:bg-accent transition-all duration-300 cursor-pointer shadow-xs z-20"
+          >
+            {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </button>
+
+          <div className="w-full max-w-md bg-card border border-border text-foreground rounded-2xl p-8 z-10 transition-colors duration-300 shadow-md">
+            <div className="text-center space-y-2 mb-8 md:hidden">
+              <img 
+                src={isDarkMode ? "/assets/loondry-logo-brand-white.png" : "/assets/loondry-logo-brand-colored.png"} 
+                alt="Loondry Logo" 
+                className="h-14 mx-auto mb-4 object-contain"
+              />
+              <p className="text-xs text-muted-foreground">Admin & Operator Portal</p>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-2.5 h-4.5 w-4.5 text-muted-foreground" />
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-background border border-border rounded-lg pl-10 pr-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground"
-                />
-              </div>
+            <div className="space-y-2 mb-8 hidden md:block">
+              <h3 className="text-2xl font-bold tracking-tight">Sign In</h3>
+              <p className="text-sm text-muted-foreground">Enter your credentials to access the admin portal</p>
             </div>
 
-            <button
-              type="submit"
-              disabled={loginLoading}
-              className="w-full bg-primary text-primary-foreground hover:bg-primary/95 py-2.5 rounded-lg font-semibold transition-colors cursor-pointer flex items-center justify-center text-sm disabled:opacity-50 mt-6"
-            >
-              {loginLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Sign In
-            </button>
-          </form>
+            <form onSubmit={handleLogin} className="space-y-4">
+              {loginError && (
+                <div className="bg-destructive/10 text-destructive border border-destructive/20 rounded-lg p-3 text-sm font-medium">
+                  {loginError}
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Email Address</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-2.5 h-4.5 w-4.5 text-muted-foreground" />
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@loondry.com"
+                    className="w-full bg-background border border-border rounded-lg pl-10 pr-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-2.5 h-4.5 w-4.5 text-muted-foreground" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-background border border-border rounded-lg pl-10 pr-10 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground"
+                  />
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground cursor-pointer"
+                    title={showPassword ? "Hide Password" : "Show Password"}
+                  >
+                    {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loginLoading}
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/95 py-2.5 rounded-lg font-semibold transition-colors cursor-pointer flex items-center justify-center text-sm disabled:opacity-50 mt-6"
+              >
+                {loginLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Sign In
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     );
@@ -449,7 +513,7 @@ export default function App() {
 
   // Dashboard Layout
   return (
-    <div className="relative h-screen overflow-hidden bg-background text-foreground flex transition-colors duration-300">
+    <div className="relative h-screen overflow-hidden bg-background text-foreground flex transition-colors duration-300 ">
 
       {/* Ambient Gradient Blur Circle */}
       <div className="absolute top-5 -right-5 h-[400px] w-[400px] md:top-[-200px] md:right-[-600px] rotate-45 blur-[120px] md:w-[1000px] md:h-[1000px]  bg-gradient-to-bl from-blue-500/20 via-blue-500/15 to-blue-500/5   pointer-events-none" />
@@ -485,12 +549,12 @@ export default function App() {
         <nav className="flex-1 px-4 py-6 space-y-1.5">
           <button
             onClick={() => handleTabChange('dashboard')}
-            className={`w-full flex items-center rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
+            className={`w-full flex items-center rounded-lg text-sm font-semibold cursor-pointer sidebar-nav-link ${
               isSidebarCollapsed ? 'justify-center p-2.5' : 'space-x-3 px-3 py-2.5'
             } ${
               activeTab === 'dashboard'
-                ? 'bg-primary text-primary-foreground'
-                : 'hover:bg-accent hover:text-accent-foreground text-muted-foreground'
+                ? 'active-nav'
+                : 'text-muted-foreground'
             }`}
             title={isSidebarCollapsed ? "Dashboard" : undefined}
           >
@@ -500,12 +564,12 @@ export default function App() {
 
           <button
             onClick={() => handleTabChange('pos')}
-            className={`w-full flex items-center rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
+            className={`w-full flex items-center rounded-lg text-sm font-semibold cursor-pointer sidebar-nav-link ${
               isSidebarCollapsed ? 'justify-center p-2.5' : 'space-x-3 px-3 py-2.5'
             } ${
               activeTab === 'pos'
-                ? 'bg-primary text-primary-foreground'
-                : 'hover:bg-accent hover:text-accent-foreground text-muted-foreground'
+                ? 'active-nav'
+                : 'text-muted-foreground'
             }`}
             title={isSidebarCollapsed ? "Transactions" : undefined}
           >
@@ -515,12 +579,12 @@ export default function App() {
 
           <button
             onClick={() => handleTabChange('customers')}
-            className={`w-full flex items-center rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
+            className={`w-full flex items-center rounded-lg text-sm font-semibold cursor-pointer sidebar-nav-link ${
               isSidebarCollapsed ? 'justify-center p-2.5' : 'space-x-3 px-3 py-2.5'
             } ${
               activeTab === 'customers'
-                ? 'bg-primary text-primary-foreground'
-                : 'hover:bg-accent hover:text-accent-foreground text-muted-foreground'
+                ? 'active-nav'
+                : 'text-muted-foreground'
             }`}
             title={isSidebarCollapsed ? "Customers" : undefined}
           >
@@ -530,12 +594,12 @@ export default function App() {
 
           <button
             onClick={() => handleTabChange('services')}
-            className={`w-full flex items-center rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
+            className={`w-full flex items-center rounded-lg text-sm font-semibold cursor-pointer sidebar-nav-link ${
               isSidebarCollapsed ? 'justify-center p-2.5' : 'space-x-3 px-3 py-2.5'
             } ${
               activeTab === 'services'
-                ? 'bg-primary text-primary-foreground'
-                : 'hover:bg-accent hover:text-accent-foreground text-muted-foreground'
+                ? 'active-nav'
+                : 'text-muted-foreground'
             }`}
             title={isSidebarCollapsed ? "Services" : undefined}
           >
@@ -545,12 +609,12 @@ export default function App() {
 
           <button
             onClick={() => handleTabChange('vouchers')}
-            className={`w-full flex items-center rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
+            className={`w-full flex items-center rounded-lg text-sm font-semibold cursor-pointer sidebar-nav-link ${
               isSidebarCollapsed ? 'justify-center p-2.5' : 'space-x-3 px-3 py-2.5'
             } ${
               activeTab === 'vouchers'
-                ? 'bg-primary text-primary-foreground'
-                : 'hover:bg-accent hover:text-accent-foreground text-muted-foreground'
+                ? 'active-nav'
+                : 'text-muted-foreground'
             }`}
             title={isSidebarCollapsed ? "Vouchers" : undefined}
           >
@@ -565,10 +629,15 @@ export default function App() {
             <div className="flex flex-col items-center space-y-4">
               {/* Profile Icon with tooltip info */}
               <div 
-                className="bg-primary/10 rounded-full p-2 text-primary border border-primary/20 cursor-help"
+                onClick={() => handleTabChange('profile')}
+                className="h-8.5 w-8.5 rounded-full overflow-hidden border border-primary/20 bg-primary/10 flex items-center justify-center cursor-pointer transition-all hover:ring-2 hover:ring-primary/20 shadow-xs"
                 title={`${user?.name} (${user?.role})`}
               >
-                <UserIcon className="h-4.5 w-4.5" />
+                {user?.avatar_url ? (
+                  <img src={user.avatar_url} alt="Profile" className="h-full w-full object-cover" />
+                ) : (
+                  <UserIcon className="h-4.5 w-4.5 text-primary" />
+                )}
               </div>
               
               {/* Theme Toggle Button */}
@@ -592,12 +661,19 @@ export default function App() {
           ) : (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2.5">
-                  <div className="bg-primary/10 rounded-full p-1.5 text-primary border border-primary/20">
-                    <UserIcon className="h-4 w-4" />
+                <div 
+                  onClick={() => handleTabChange('profile')}
+                  className="flex items-center space-x-2.5 cursor-pointer hover:opacity-85 transition-opacity"
+                >
+                  <div className="h-7 w-7 rounded-full overflow-hidden border border-primary/20 bg-primary/10 flex items-center justify-center shadow-xs">
+                    {user?.avatar_url ? (
+                      <img src={user.avatar_url} alt="Profile" className="h-full w-full object-cover" />
+                    ) : (
+                      <UserIcon className="h-4 w-4 text-primary" />
+                    )}
                   </div>
                   <div className="text-left">
-                    <span className="font-semibold text-xs text-foreground block max-w-36 truncate">{user?.name}</span>
+                    <span className="font-semibold text-xs text-foreground block max-w-28 truncate">{user?.name}</span>
                     <span className="text-[10px] text-muted-foreground uppercase font-bold block tracking-wider">{user?.role}</span>
                   </div>
                 </div>
@@ -715,6 +791,16 @@ export default function App() {
         }}
         title={getSlideOverTitle()}
       >
+        {slideOverType === 'send-notification' && (
+          <NotificationsView
+            onSubmitSuccess={handleFormSubmitSuccess}
+            onCancel={() => {
+              setSlideOverType(null);
+              setActiveItem(null);
+            }}
+          />
+        )}
+
         {slideOverType === 'create-order' && (
           <TransactionForm
             onSubmitSuccess={handleFormSubmitSuccess}
@@ -777,19 +863,8 @@ export default function App() {
           />
         )}
 
-        {slideOverType === 'redeem-voucher' && (
-          <RedeemVoucherForm
-            customer={activeItem}
-            onSubmitSuccess={handleFormSubmitSuccess}
-            onCancel={() => {
-              setSlideOverType(null);
-              setActiveItem(null);
-            }}
-          />
-        )}
-
-        {slideOverType === 'apply-voucher' && (
-          <ApplyVoucherForm
+        {slideOverType === 'order-photos' && (
+          <OrderPhotoForm
             transaction={activeItem}
             onSubmitSuccess={handleFormSubmitSuccess}
             onCancel={() => {
@@ -871,6 +946,7 @@ export default function App() {
           </div>
         )}
       </SlideOver>
+      <Toaster position="top-center" />
     </div>
   );
 }

@@ -1,0 +1,3303 @@
+import React, { useState, useEffect } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  Modal,
+  Clipboard,
+  Platform,
+  Image,
+  Dimensions,
+  StatusBar,
+  useColorScheme,
+  ImageBackground,
+  KeyboardAvoidingView,
+  Animated
+} from 'react-native';
+import {
+  SafeAreaView,
+  SafeAreaProvider,
+  SafeAreaInsetsContext,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFonts } from 'expo-font';
+import * as ImagePicker from 'expo-image-picker';
+import { api, API_BASE, setApiBaseUrl, setAuthToken, getSavedUser, formatImageUrl } from './src/api';
+
+const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
+
+// Exact HSL color translations from Web Admin's tailwind setup
+const LIGHT_COLORS = {
+  background: '#f1f5f9',     // Slate-100 (from hsl(210 20% 98%))
+  foreground: '#0f172a',     // Slate-900 (from hsl(222 47% 11%))
+  card: '#ffffff',           // White (from hsl(0 0% 100%))
+  cardBorder: '#e2e8f0',     // Slate-200 (from hsl(210 20% 90%))
+  primary: '#3b82f6',        // Blue-500 (from hsl(205 62% 54%))
+  primaryForeground: '#ffffff',
+  secondary: '#f1f5f9',      // Slate-100 (from hsl(210 20% 95%))
+  secondaryForeground: '#0f172a',
+  muted: '#f1f5f9',
+  mutedForeground: '#64748b', // Slate-500 (from hsl(215 16% 47%))
+  success: '#10b981',        // Emerald
+  warning: '#f59e0b',        // Amber
+  danger: '#ef4444',         // Red
+  info: '#0ea5e9',           // Cyan
+  disabled: '#cbd5e1'
+};
+
+const DARK_COLORS = {
+  background: '#060814',     // Custom very dark deep blue (from hsl(222 47% 6%))
+  foreground: '#f8fafc',     // Slate-50 (from hsl(210 20% 98%))
+  card: '#0b0f19',           // Custom dark blue card (from hsl(222 47% 9%))
+  cardBorder: '#1e293b',     // Slate-800 (from hsl(222 20% 16%))
+  primary: '#54b7f2',        // Sky Blue (from hsl(202 69% 63%))
+  primaryForeground: '#060814',
+  secondary: '#1e293b',      // Slate-800 (from hsl(222 20% 15%))
+  secondaryForeground: '#f8fafc',
+  muted: '#0f172a',          // Slate-900 (from hsl(222 20% 12%))
+  mutedForeground: '#94a3b8', // Slate-400 (from hsl(215 16% 70%))
+  success: '#10b981',        // Emerald
+  warning: '#f59e0b',        // Amber
+  danger: '#ef4444',         // Red
+  info: '#0ea5e9',           // Cyan
+  disabled: '#475569'
+};
+
+const { width, height } = Dimensions.get('window');
+const MOCK_PROOF_BASE64 = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
+export default function App() {
+  const [fontsLoaded] = useFonts({
+    'Geist-Regular': require('./assets/fonts/Geist-Regular.ttf'),
+    'Geist-Medium': require('./assets/fonts/Geist-Medium.ttf'),
+    'Geist-SemiBold': require('./assets/fonts/Geist-SemiBold.ttf'),
+    'Geist-Bold': require('./assets/fonts/Geist-Bold.ttf'),
+    'Geist-Black': require('./assets/fonts/Geist-Black.ttf'),
+    'Geist-Light': require('./assets/fonts/Geist-Light.ttf'),
+    'Geist-Thin': require('./assets/fonts/Geist-Thin.ttf'),
+  });
+
+  const systemColorScheme = useColorScheme();
+
+  // App initialization states
+  const [appReady, setAppReady] = useState(false);
+  
+  // Navigation & Theme Settings
+  const [currentScreen, setCurrentScreen] = useState<'splash' | 'walkthrough' | 'login' | 'dashboard' | 'vouchers' | 'profile'>('splash');
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [themeSetting, setThemeSetting] = useState<'system' | 'light' | 'dark'>('system');
+  
+  // Credentials & Server Address
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [user, setUser] = useState<any>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginError, setLoginError] = useState('');
+  const [isLoginDrawerOpen, setIsLoginDrawerOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Dynamic state for theme mode
+  const isDark = themeSetting === 'system' 
+    ? systemColorScheme === 'dark' 
+    : themeSetting === 'dark';
+    
+  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const styles = createStyles(colors, isDark);
+
+  // Data States
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loadingTransactions, setLoadingTransactions] = useState(false);
+  const [selectedTx, setSelectedTx] = useState<any>(null);
+  const [isTxDetailOpen, setIsTxDetailOpen] = useState(false);
+
+  // Points & Vouchers States
+  const [pointsData, setPointsData] = useState<any>({ points: 0, redemption_history: [] });
+  const [unusedVouchers, setUnusedVouchers] = useState<any[]>([]);
+  const [voucherTemplates, setVoucherTemplates] = useState<any[]>([]);
+  const [loadingVouchers, setLoadingVouchers] = useState(false);
+  const [voucherSubTab, setVoucherSubTab] = useState<'mine' | 'catalog'>('mine');
+
+  // Checkout States
+  const [paymentMethod, setPaymentMethod] = useState<'transfer' | 'qris' | 'cash'>('transfer');
+  const [voucherCodeInput, setVoucherCodeInput] = useState('');
+  const [checkingVoucher, setCheckingVoucher] = useState(false);
+  const [appliedVoucher, setAppliedVoucher] = useState<any>(null);
+  const [voucherError, setVoucherError] = useState('');
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+  const [showProofPicker, setShowProofPicker] = useState(false);
+  const [selectedProofBase64, setSelectedProofBase64] = useState<string | null>(null);
+
+  // Profile Edit States
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  // Change Password States
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
+
+  // Custom Toast Notification State
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('success');
+  const [toastMounted, setToastMounted] = useState(false);
+  const toastOpacity = React.useRef(new Animated.Value(0)).current;
+  const toastTimeoutRef = React.useRef<any>(null);
+
+  const toastTranslateY = toastOpacity.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-20, 0],
+  });
+
+  // Trigger Toast Notification helper
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    
+    // Reset opacity to 0 immediately to prevent any single-frame flashing
+    toastOpacity.setValue(0);
+    setToastMessage(message);
+    setToastType(type);
+    setToastMounted(true);
+
+    Animated.timing(toastOpacity, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+
+    toastTimeoutRef.current = setTimeout(() => {
+      hideToast();
+    }, 3500);
+  };
+
+  const hideToast = () => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+      toastTimeoutRef.current = null;
+    }
+    Animated.timing(toastOpacity, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) {
+        setToastMounted(false);
+      }
+    });
+  };
+
+  // Transaction Filter Tab
+  const [txFilter, setTxFilter] = useState<'all' | 'active' | 'completed'>('all');
+
+  // Load configuration from local storage on mount
+  useEffect(() => {
+    async function initApp() {
+      const startTime = Date.now();
+      let targetScreen: 'login' | 'dashboard' | 'walkthrough' = 'login';
+      try {
+        const savedToken = await AsyncStorage.getItem('lnd_token');
+        const savedUserJson = await AsyncStorage.getItem('lnd_user');
+        const savedTheme = await AsyncStorage.getItem('lnd_theme');
+        const onboarded = await AsyncStorage.getItem('lnd_onboarded');
+
+        if (savedTheme) {
+          setThemeSetting(savedTheme as any);
+        }
+
+        if (savedToken && savedUserJson) {
+          setAuthToken(savedToken);
+          const parsedUser = JSON.parse(savedUserJson);
+          setUser(parsedUser);
+          setEditName(parsedUser.name || '');
+          setEditPhone(parsedUser.customer?.phone || '');
+          setEditAddress(parsedUser.customer?.address || '');
+          targetScreen = 'dashboard';
+          
+          // Verify token against backend in background
+          api.getProfile().then(profileRes => {
+            if (profileRes.user) {
+              setUser(profileRes.user);
+              AsyncStorage.setItem('lnd_user', JSON.stringify(profileRes.user));
+            }
+          }).catch(() => {
+            // If session expired
+            handleLogout();
+          });
+        } else {
+          targetScreen = 'walkthrough';
+        }
+      } catch (err) {
+        console.log('App initiation error', err);
+      } finally {
+        const elapsedTime = Date.now() - startTime;
+        const remainingTime = Math.max(0, 2500 - elapsedTime);
+        setTimeout(() => {
+          setAppReady(true);
+          setCurrentScreen(targetScreen);
+        }, remainingTime);
+      }
+    }
+    initApp();
+  }, []);
+
+  // Fetch all customer dashboard data
+  const refreshDashboardData = async () => {
+    if (!user) return;
+    setLoadingTransactions(true);
+    try {
+      const txRes = await api.getMyTransactions();
+      setTransactions(txRes.data || []);
+
+      const ptsRes = await api.getMyPoints();
+      setPointsData(ptsRes || { points: 0, redemption_history: [] });
+
+      const profileRes = await api.getProfile();
+      if (profileRes.user) {
+        setUser(profileRes.user);
+        setEditName(profileRes.user.name || '');
+        setEditPhone(profileRes.user.customer?.phone || '');
+        setEditAddress(profileRes.user.customer?.address || '');
+        await AsyncStorage.setItem('lnd_user', JSON.stringify(profileRes.user));
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Failed to sync dashboard', 'error');
+      if (err.message?.includes('401') || err.message?.includes('unauthenticated')) {
+        handleLogout();
+      }
+    } finally {
+      setLoadingTransactions(false);
+    }
+  };
+
+  // Fetch unused vouchers & template list
+  const loadVouchersTab = async () => {
+    setLoadingVouchers(true);
+    try {
+      const vouchersRes = await api.getMyVouchers();
+      setUnusedVouchers(vouchersRes.data || []);
+
+      const templatesRes = await api.getVoucherTemplates();
+      const activeTemplates = (templatesRes.data || []).filter((t: any) => t.status === 'active');
+      setVoucherTemplates(activeTemplates);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to load vouchers', 'error');
+    } finally {
+      setLoadingVouchers(false);
+    }
+  };
+
+  // Sync state transitions to trigger refreshes
+  useEffect(() => {
+    if (currentScreen === 'dashboard') {
+      refreshDashboardData();
+    } else if (currentScreen === 'vouchers') {
+      loadVouchersTab();
+    }
+  }, [currentScreen]);
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      setLoginError('Tolong masukkan email dan password.');
+      return;
+    }
+
+    setIsLoggingIn(true);
+    setLoginError('');
+    try {
+      const res = await api.login({ email, password });
+      
+      if (res.user.role !== 'customer') {
+        await api.logout();
+        throw new Error('Aplikasi ini hanya untuk member pelanggan. Admin silakan gunakan Web Portal.');
+      }
+
+      setUser(res.user);
+      setEditName(res.user.name || '');
+      setEditPhone(res.user.customer?.phone || '');
+      setEditAddress(res.user.customer?.address || '');
+
+      // Store in persistent storage
+      await AsyncStorage.setItem('lnd_token', res.access_token);
+      await AsyncStorage.setItem('lnd_user', JSON.stringify(res.user));
+
+      showToast(`Selamat datang kembali, ${res.user.name}!`, 'success');
+      setIsLoginDrawerOpen(false);
+      setCurrentScreen('dashboard');
+    } catch (err: any) {
+      setLoginError(err.message || 'Email atau password yang Anda masukkan salah.');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+    } catch (e) {}
+    
+    // Clear storage
+    await AsyncStorage.removeItem('lnd_token');
+    await AsyncStorage.removeItem('lnd_user');
+    
+    setUser(null);
+    setAuthToken(null);
+    setCurrentScreen('login');
+    setSelectedTx(null);
+    setIsTxDetailOpen(false);
+    showToast('Logged out successfully', 'info');
+  };
+
+  const changeThemeSetting = async (theme: 'system' | 'light' | 'dark') => {
+    setThemeSetting(theme);
+    await AsyncStorage.setItem('lnd_theme', theme);
+    showToast(`Theme changed to ${theme.toUpperCase()}`, 'success');
+  };
+
+  const copyToClipboard = (text: string) => {
+    Clipboard.setString(text);
+    showToast(`Voucher code "${text}" copied!`, 'success');
+  };
+
+  const handleRedeemVoucher = async (template: any) => {
+    if (pointsData.points < template.points_cost) {
+      showToast('Insufficient loyalty points!', 'error');
+      return;
+    }
+
+    setLoadingVouchers(true);
+    try {
+      const res = await api.redeemVoucher(template.id);
+      showToast(res.message || 'Voucher redeemed successfully!', 'success');
+      
+      // Update local points
+      setPointsData((prev: any) => ({
+        ...prev,
+        points: prev.points - template.points_cost
+      }));
+      
+      await loadVouchersTab();
+      setVoucherSubTab('mine'); 
+    } catch (err: any) {
+      showToast(err.message || 'Failed to redeem voucher', 'error');
+    } finally {
+      setLoadingVouchers(false);
+    }
+  };
+
+  const checkVoucher = async () => {
+    if (!voucherCodeInput.trim()) {
+      showToast('Please enter a voucher code', 'info');
+      return;
+    }
+    setCheckingVoucher(true);
+    setVoucherError('');
+    setAppliedVoucher(null);
+    try {
+      const res = await api.checkVoucherCode(
+        voucherCodeInput.trim(),
+        selectedTx.total_price,
+        user.customer.id
+      );
+      if (res.valid) {
+        setAppliedVoucher(res);
+        showToast('Voucher code applied!', 'success');
+      } else {
+        setVoucherError(res.message || 'Voucher invalid');
+      }
+    } catch (err: any) {
+      setVoucherError(err.message || 'Voucher invalid or expired');
+    } finally {
+      setCheckingVoucher(false);
+    }
+  };
+
+  const submitPaymentProof = async () => {
+    setIsSubmittingPayment(true);
+    try {
+      const payload: any = {
+        payment_method: paymentMethod,
+      };
+
+      if (appliedVoucher) {
+        payload.voucher_code = appliedVoucher.voucher_code;
+      }
+
+      if (paymentMethod !== 'cash') {
+        payload.payment_proof_base64 = selectedProofBase64 || MOCK_PROOF_BASE64;
+        payload.payment_proof_name = 'payment_proof.jpg';
+      }
+
+      await api.uploadPaymentProof(selectedTx.id, payload);
+      showToast('Payment submitted successfully!', 'success');
+      
+      setIsTxDetailOpen(false);
+      setSelectedTx(null);
+      refreshDashboardData();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to submit payment', 'error');
+    } finally {
+      setIsSubmittingPayment(false);
+    }
+  };
+
+  const handlePickAvatar = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        showToast('Permission to access camera roll is required!', 'error');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      setIsUploadingAvatar(true);
+      const asset = result.assets[0];
+      const uri = asset.uri;
+      const fileName = asset.fileName || 'avatar.jpg';
+
+      const res = await api.updateAvatar(uri, fileName);
+      setUser(res.user);
+      await AsyncStorage.setItem('lnd_user', JSON.stringify(res.user));
+      showToast('Profile photo updated successfully!', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to upload photo', 'error');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!editName.trim()) {
+      showToast('Name cannot be empty', 'error');
+      return;
+    }
+    setIsSavingProfile(true);
+    try {
+      const res = await api.updateCustomerProfile({
+        name: editName,
+        phone: editPhone,
+        address: editAddress
+      });
+      showToast('Profile updated successfully!', 'success');
+      setUser(res.user);
+      await AsyncStorage.setItem('lnd_user', JSON.stringify(res.user));
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update profile', 'error');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      showToast('Please fill out all password fields', 'error');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showToast('New passwords do not match', 'error');
+      return;
+    }
+    if (newPassword.length < 8) {
+      showToast('Password must be at least 8 characters long', 'error');
+      return;
+    }
+
+    setIsSavingPassword(true);
+    try {
+      await api.updatePassword({
+        current_password: currentPassword,
+        password: newPassword,
+        password_confirmation: confirmPassword
+      });
+      showToast('Password changed successfully!', 'success');
+      setIsPasswordModalOpen(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to change password', 'error');
+    } finally {
+      setIsSavingPassword(false);
+    }
+  };
+
+  const openTransactionDetail = async (tx: any) => {
+    setLoadingTransactions(true);
+    try {
+      const res = await api.getTransactionDetails(tx.id);
+      setSelectedTx(res.data);
+      setVoucherCodeInput('');
+      setAppliedVoucher(null);
+      setVoucherError('');
+      setPaymentMethod('transfer');
+      setSelectedProofBase64(null);
+      setIsTxDetailOpen(true);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to load details', 'error');
+    } finally {
+      setLoadingTransactions(false);
+    }
+  };
+
+  if (!fontsLoaded) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#3b82f6" />
+      </View>
+    );
+  }
+
+  if (currentScreen === 'splash') {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+        <View style={{ alignItems: 'center' }}>
+          <Image 
+            source={isDark ? require('./assets/loondry-logo-brand-white.png') : require('./assets/loondry-logo-brand-colored.png')} 
+            style={{ width: width * 0.6, height: height * 0.15 }}
+            resizeMode="contain"
+          />
+          <Text style={{
+            color: colors.mutedForeground,
+            fontSize: 12,
+            fontFamily: 'Geist-Medium',
+            marginTop: 10,
+            letterSpacing: 2,
+          }}>
+            PREMIUM LAUNDRY & FABRIC CARE
+          </Text>
+        </View>
+        <View style={{ position: 'absolute', bottom: 50 }}>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (currentScreen === 'walkthrough') {
+    const slides = [
+      {
+        title: 'Bersih',
+        desc: 'Pakaian Anda diproses secara profesional hingga bersih cemerlang bebas noda.',
+        image: require('./assets/clean-laundry.jpg'),
+      },
+      {
+        title: 'Harum',
+        desc: 'Keharuman mewah pilihan yang segar dan tahan lama di setiap helai pakaian.',
+        image: require('./assets/fragrant-laundry.jpg'),
+      },
+      {
+        title: 'Higienis',
+        desc: 'Sterilisasi maksimal dengan uap panas tinggi untuk membunuh kuman dan bakteri.',
+        image: require('./assets/hygienic-laundry.jpg'),
+      }
+    ];
+
+    const slide = slides[activeSlide];
+    const handleCompleteOnboarding = async () => {
+      try {
+        await AsyncStorage.setItem('lnd_onboarded', 'true');
+        setCurrentScreen('login');
+      } catch (e) {
+        setCurrentScreen('login');
+      }
+    };
+
+    return (
+      <SafeAreaView 
+        style={[styles.walkthroughContainer, { backgroundColor: colors.background }]}
+        onTouchStart={() => {
+          if (toastMounted) {
+            hideToast();
+          }
+        }}
+      >
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+        
+        {/* Skip button */}
+        <TouchableOpacity 
+          style={styles.skipBtn}
+          onPress={handleCompleteOnboarding}
+        >
+          <Text style={styles.skipBtnText}>Lewati</Text>
+        </TouchableOpacity>
+
+        {/* Content slide */}
+        <View style={styles.walkthroughContent}>
+          <Image 
+            source={slide.image} 
+            style={styles.walkthroughImage}
+            resizeMode="cover"
+          />
+          
+          <Text style={[styles.walkthroughTitle, { color: colors.foreground }]}>
+            {slide.title}
+          </Text>
+          
+          <Text style={[styles.walkthroughDesc, { color: colors.mutedForeground }]}>
+            {slide.desc}
+          </Text>
+        </View>
+
+        {/* Footer: Pagination dots and Next/Get Started button */}
+        <View style={styles.walkthroughFooter}>
+          {/* Dots Indicator */}
+          <View style={styles.dotsRow}>
+            {slides.map((_, index) => (
+              <View 
+                key={index}
+                style={[
+                  styles.dot, 
+                  { backgroundColor: activeSlide === index ? colors.primary : colors.mutedForeground + '40' },
+                  activeSlide === index && { width: 20 }
+                ]}
+              />
+            ))}
+          </View>
+
+          {/* Button */}
+          <TouchableOpacity 
+            style={[styles.nextBtn, { backgroundColor: colors.primary }]}
+            onPress={() => {
+              if (activeSlide < slides.length - 1) {
+                setActiveSlide(activeSlide + 1);
+              } else {
+                handleCompleteOnboarding();
+              }
+            }}
+          >
+            <Text style={[styles.nextBtnText, { color: colors.primaryForeground }]}>
+              {activeSlide === slides.length - 1 ? 'Mulai Sekarang' : 'Lanjut'}
+            </Text>
+            <Ionicons 
+              name={activeSlide === slides.length - 1 ? 'arrow-forward' : 'chevron-forward'} 
+              size={18} 
+              color={colors.primaryForeground} 
+              style={{ marginLeft: 5 }}
+            />
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Filter Transactions
+  const filteredTransactions = transactions.filter((tx) => {
+    if (txFilter === 'all') return true;
+    if (txFilter === 'active') {
+      return ['antrian', 'dicuci', 'disetrika', 'siap diambil'].includes(tx.status);
+    }
+    if (txFilter === 'completed') {
+      return tx.status === 'diambil';
+    }
+    return true;
+  });
+
+  return (
+    <SafeAreaView 
+      style={styles.safeContainer}
+      onTouchStart={() => {
+        if (toastMounted) {
+          hideToast();
+        }
+      }}
+    >
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.card} />
+      
+      {/* 1. Header with dynamic Loondry branding */}
+      {currentScreen !== 'login' && (
+        <View style={styles.header}>
+          <View style={styles.headerProfile}>
+            <Image 
+              source={isDark ? require('./assets/loondry-logo-white.png') : require('./assets/loondry-logo-colored.png')} 
+              style={styles.headerLogoIcon} 
+              resizeMode="contain"
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.headerGreeting}>Pelanggan Loondry</Text>
+              <Text style={styles.headerName} numberOfLines={1}>{user?.name || 'Customer'}</Text>
+            </View>
+          </View>
+          <View style={styles.pointsBadge}>
+            <MaterialCommunityIcons name="trophy" size={16} color="#fbbf24" />
+            <Text style={styles.pointsBadgeText}>{pointsData.points || 0} Pts</Text>
+          </View>
+        </View>
+      )}
+
+      {/* 2. Login Screen */}
+      {currentScreen === 'login' && (
+        <View style={{ flex: 1 }}>
+          <StatusBar barStyle="light-content" backgroundColor="#09090b" />
+          
+          <ImageBackground
+            source={require('./assets/login-bg.jpg')}
+            style={StyleSheet.absoluteFill}
+            resizeMode="cover"
+          >
+            {/* Dark Premium overlay */}
+            <View style={styles.brandOverlay} />
+            
+            <SafeAreaView style={styles.brandContainer}>
+              {/* Header with logo & floating theme toggle */}
+              <View style={styles.brandHeader}>
+                <Image 
+                  source={require('./assets/loondry-logo-brand-white.png')} 
+                  style={styles.brandLogoImageLarge}
+                  resizeMode="contain"
+                />
+                
+                <TouchableOpacity
+                  style={styles.brandThemeToggle}
+                  onPress={() => changeThemeSetting(isDark ? 'light' : 'dark')}
+                >
+                  <Ionicons name={isDark ? 'sunny-outline' : 'moon-outline'} size={18} color="#ffffff" />
+                </TouchableOpacity>
+              </View>
+              
+              {/* Centered content showing motto */}
+              <View style={styles.brandContent}>
+                <View style={styles.brandMottoBox}>
+                  <Text style={styles.brandMottoTitle}>
+                    Bersih, Harum, Higienis.
+                  </Text>
+                  <Text style={styles.brandMottoSubtitle}>
+                    The Premium Laundry Experience, Simplified.
+                  </Text>
+                </View>
+              </View>
+              
+              {/* Bottom section with Login CTA and Copyright */}
+              <View style={styles.brandFooter}>
+                <TouchableOpacity 
+                  style={styles.brandLoginBtn} 
+                  onPress={() => {
+                    setLoginError('');
+                    setIsLoginDrawerOpen(true);
+                  }}
+                >
+                  <Text style={styles.brandLoginBtnText}>Masuk Sekarang</Text>
+                  <Ionicons name="arrow-forward" size={18} color="#09090b" style={{ marginLeft: 8 }} />
+                </TouchableOpacity>
+                
+                <Text style={styles.brandCopyrightText}>
+                  &copy; {new Date().getFullYear()} Loondry. All rights reserved.
+                </Text>
+              </View>
+            </SafeAreaView>
+          </ImageBackground>
+
+          {/* Bottom Drawer Modal for credentials login */}
+          <Modal
+            visible={isLoginDrawerOpen}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setIsLoginDrawerOpen(false)}
+          >
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={{ flex: 1 }}
+            >
+              <View style={styles.drawerOverlay}>
+                {/* Click outside to close */}
+                <TouchableOpacity 
+                  style={styles.drawerDismissArea} 
+                  activeOpacity={1} 
+                  onPress={() => setIsLoginDrawerOpen(false)}
+                />
+                
+                <View style={[styles.drawerContent, { backgroundColor: colors.card, borderTopColor: colors.cardBorder }]}>
+                  {/* Top drag indicator handle */}
+                  <View style={[styles.drawerHandleBar, { backgroundColor: colors.mutedForeground + '30' }]} />
+                  
+                  <View style={styles.drawerHeader}>
+                    <Text style={[styles.drawerTitle, { color: colors.foreground }]}>Masuk ke Akun</Text>
+                    <TouchableOpacity 
+                      style={[styles.drawerCloseBtn, { backgroundColor: colors.mutedForeground + '15' }]} 
+                      onPress={() => setIsLoginDrawerOpen(false)}
+                    >
+                      <Ionicons name="close" size={18} color={colors.foreground} />
+                    </TouchableOpacity>
+                  </View>
+
+                  <ScrollView 
+                    contentContainerStyle={styles.drawerScrollContent}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                  >
+                    {loginError ? (
+                      <View style={styles.loginErrorBox}>
+                        <Text style={styles.loginErrorText}>{loginError}</Text>
+                      </View>
+                    ) : null}
+
+                    <View style={styles.inputFieldGroup}>
+                      <Text style={[styles.inputLabel, { color: colors.mutedForeground }]}>Email Address</Text>
+                      <View style={[styles.inputWrapper, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}>
+                        <Ionicons name="mail" size={16} color={colors.mutedForeground} style={styles.inputFieldIcon} />
+                        <TextInput
+                          style={[styles.inputField, { color: colors.foreground }]}
+                          placeholder="nama@loondry.com"
+                          placeholderTextColor={colors.mutedForeground}
+                          keyboardType="email-address"
+                          autoCapitalize="none"
+                          value={email}
+                          onChangeText={(text) => {
+                            setEmail(text);
+                            setLoginError('');
+                          }}
+                        />
+                      </View>
+                    </View>
+
+                    <View style={styles.inputFieldGroup}>
+                      <Text style={[styles.inputLabel, { color: colors.mutedForeground }]}>Password</Text>
+                      <View style={[styles.inputWrapper, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}>
+                        <Ionicons name="lock-closed" size={16} color={colors.mutedForeground} style={styles.inputFieldIcon} />
+                        <TextInput
+                          style={[styles.inputField, { color: colors.foreground, flex: 1, paddingRight: 0 }]}
+                          placeholder="••••••••"
+                          placeholderTextColor={colors.mutedForeground}
+                          secureTextEntry={!showPassword}
+                          autoCapitalize="none"
+                          value={password}
+                          onChangeText={(text) => {
+                            setPassword(text);
+                            setLoginError('');
+                          }}
+                        />
+                        <TouchableOpacity 
+                          style={{ 
+                            paddingHorizontal: 12,
+                            height: '100%',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                          }}
+                          onPress={() => setShowPassword(!showPassword)}
+                        >
+                          <Ionicons 
+                            name={showPassword ? 'eye-off' : 'eye'} 
+                            size={16} 
+                            color={colors.mutedForeground} 
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    <TouchableOpacity 
+                      style={[styles.loginButton, { backgroundColor: colors.primary }, isLoggingIn && { opacity: 0.7 }]} 
+                      onPress={handleLogin}
+                      disabled={isLoggingIn}
+                    >
+                      {isLoggingIn ? (
+                        <ActivityIndicator color={colors.primaryForeground} size="small" />
+                      ) : (
+                        <Text style={[styles.loginButtonText, { color: colors.primaryForeground }]}>Masuk</Text>
+                      )}
+                    </TouchableOpacity>
+                  </ScrollView>
+                </View>
+              </View>
+            </KeyboardAvoidingView>
+          </Modal>
+        </View>
+      )}
+
+      {/* 3. Dashboard Tracker View */}
+      {currentScreen === 'dashboard' && (
+        <View style={styles.screenContainer}>
+          <View style={styles.welcomeBanner}>
+            <View>
+              <Text style={styles.bannerTitle}>Status Cucian</Text>
+              <Text style={styles.bannerSubtitle}>Pantau cucian Anda secara real-time</Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.refreshBtn} 
+              onPress={refreshDashboardData}
+              disabled={loadingTransactions}
+            >
+              <Ionicons name="refresh" size={18} color={colors.foreground} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Loyalty Points display card */}
+          <TouchableOpacity 
+            style={styles.dashboardPointsCard}
+            onPress={() => setCurrentScreen('vouchers')}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.pointsLabel}>Loyalty points balance</Text>
+              <Text style={styles.pointsValue}>{pointsData.points || 0} pts</Text>
+            </View>
+            <View style={styles.pointsAction}>
+              <Text style={styles.pointsActionText}>Tukar Voucher</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.success} />
+            </View>
+          </TouchableOpacity>
+
+          {/* Tab Filter */}
+          <View style={styles.filterTabs}>
+            {(['all', 'active', 'completed'] as const).map((filter) => (
+              <TouchableOpacity
+                key={filter}
+                style={[styles.filterTab, txFilter === filter && styles.filterTabActive]}
+                onPress={() => setTxFilter(filter)}
+              >
+                <Text style={[styles.filterTabText, txFilter === filter && styles.filterTabTextActive]}>
+                  {filter === 'all' ? 'Semua' : filter === 'active' ? 'Diproses' : 'Selesai'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {loadingTransactions && transactions.length === 0 ? (
+            <View style={styles.loaderCenter}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : (
+            <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+              {filteredTransactions.length > 0 ? (
+                filteredTransactions.map((tx) => {
+                  let statusColor = colors.mutedForeground;
+                  let statusBg = isDark ? 'rgba(71,85,105,0.2)' : 'rgba(241,245,249,0.8)';
+                  
+                  if (tx.status === 'antrian') {
+                    statusColor = colors.mutedForeground;
+                  } else if (tx.status === 'dicuci') {
+                    statusColor = colors.info;
+                    statusBg = isDark ? 'rgba(14,165,233,0.15)' : 'rgba(14,165,233,0.1)';
+                  } else if (tx.status === 'disetrika') {
+                    statusColor = colors.warning;
+                    statusBg = isDark ? 'rgba(245,158,11,0.15)' : 'rgba(245,158,11,0.1)';
+                  } else if (tx.status === 'siap diambil') {
+                    statusColor = colors.success;
+                    statusBg = isDark ? 'rgba(16,185,129,0.15)' : 'rgba(16,185,129,0.1)';
+                  } else if (tx.status === 'diambil') {
+                    statusColor = colors.mutedForeground;
+                  }
+
+                  const isPaid = tx.payment_status === 'paid';
+
+                  return (
+                    <TouchableOpacity
+                      key={tx.id}
+                      style={styles.txCard}
+                      onPress={() => openTransactionDetail(tx)}
+                    >
+                      <View style={styles.txCardHeader}>
+                        <Text style={styles.invoiceCode}>{tx.invoice_code}</Text>
+                        <View style={[styles.statusBadge, { backgroundColor: statusBg }]}>
+                          <Text style={[styles.statusBadgeText, { color: statusColor }]}>
+                            {tx.status === 'antrian' ? 'Antrian' : tx.status === 'dicuci' ? 'Dicuci' : tx.status === 'disetrika' ? 'Disetrika' : tx.status === 'siap diambil' ? 'Siap Diambil' : 'Sudah Diambil'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.txCardBody}>
+                        <View style={styles.txInfoRow}>
+                          <MaterialCommunityIcons name="layers-triple" size={14} color={colors.mutedForeground} />
+                          <Text style={styles.txInfoText}>
+                            {tx.service?.service_name || 'Layanan'} ({tx.weight} {tx.service?.unit || 'Kg'})
+                          </Text>
+                        </View>
+                        <View style={styles.txInfoRow}>
+                          <Ionicons name="calendar-outline" size={14} color={colors.mutedForeground} />
+                          <Text style={styles.txInfoText}>
+                            {new Date(tx.created_at).toLocaleDateString('id-ID', {
+                              day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                            })}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.txCardFooter}>
+                        <View>
+                          <Text style={styles.priceLabel}>Biaya Cucian</Text>
+                          <Text style={styles.priceValue}>Rp {Number(tx.total_price).toLocaleString('id-ID')}</Text>
+                        </View>
+                        <View style={[styles.payBadge, { backgroundColor: isPaid ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)' }]}>
+                          <Text style={[styles.payBadgeText, { color: isPaid ? colors.success : colors.danger }]}>
+                            {isPaid ? 'LUNAS' : 'PENDING'}
+                          </Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <MaterialCommunityIcons name="text-box-search-outline" size={48} color={colors.mutedForeground} />
+                  <Text style={styles.emptyText}>Tidak ada riwayat transaksi</Text>
+                </View>
+              )}
+            </ScrollView>
+          )}
+        </View>
+      )}
+
+      {/* 4. Vouchers Tab */}
+      {currentScreen === 'vouchers' && (
+        <View style={styles.screenContainer}>
+          <View style={styles.voucherSubTabs}>
+            <TouchableOpacity 
+              style={[styles.voucherSubTab, voucherSubTab === 'mine' && styles.voucherSubTabActive]}
+              onPress={() => setVoucherSubTab('mine')}
+            >
+              <Text style={[styles.voucherSubTabText, voucherSubTab === 'mine' && styles.voucherSubTabTextActive]}>
+                Voucher Saya ({unusedVouchers.length})
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.voucherSubTab, voucherSubTab === 'catalog' && styles.voucherSubTabActive]}
+              onPress={() => setVoucherSubTab('catalog')}
+            >
+              <Text style={[styles.voucherSubTabText, voucherSubTab === 'catalog' && styles.voucherSubTabTextActive]}>
+                Tukar Points
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {loadingVouchers && unusedVouchers.length === 0 && voucherTemplates.length === 0 ? (
+            <View style={styles.loaderCenter}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : (
+            <ScrollView contentContainerStyle={styles.scrollContent}>
+              {voucherSubTab === 'mine' ? (
+                unusedVouchers.length > 0 ? (
+                  unusedVouchers.map((v) => {
+                    const expiresAt = v.expires_at ? new Date(v.expires_at).toLocaleDateString('id-ID') : 'Tidak Terbatas';
+                    return (
+                      <View key={v.id} style={styles.voucherCard}>
+                        <View style={styles.voucherSidePattern}>
+                          <MaterialCommunityIcons name="ticket-percent" size={24} color={colors.primaryForeground} />
+                        </View>
+                        <View style={styles.voucherCardDetails}>
+                          <Text style={styles.voucherName} numberOfLines={1}>{v.voucher?.name || 'Voucher Diskon'}</Text>
+                          <Text style={styles.voucherDetailText}>
+                            {v.voucher?.discount_type === 'percentage' 
+                              ? `Diskon ${Number(v.voucher.discount_value)}%`
+                              : `Potongan Rp ${Number(v.voucher?.discount_value || v.discount_value).toLocaleString()}`}
+                          </Text>
+                          
+                          <View style={styles.codeContainer}>
+                            <Text style={styles.voucherCodeText}>{v.voucher_code}</Text>
+                            <TouchableOpacity 
+                              style={styles.copyBtn} 
+                              onPress={() => copyToClipboard(v.voucher_code)}
+                            >
+                              <Ionicons name="copy-outline" size={13} color={colors.primary} />
+                              <Text style={styles.copyBtnText}>Salin</Text>
+                            </TouchableOpacity>
+                          </View>
+                          <Text style={styles.voucherExpiry}>Kedaluwarsa: {expiresAt}</Text>
+                        </View>
+                      </View>
+                    );
+                  })
+                ) : (
+                  <View style={styles.emptyContainer}>
+                    <MaterialCommunityIcons name="ticket-outline" size={48} color={colors.mutedForeground} />
+                    <Text style={styles.emptyText}>Belum ada voucher aktif</Text>
+                    <Text style={styles.emptyDesc}>Kumpulkan loyalty points dan tukarkan di katalog voucher.</Text>
+                  </View>
+                )
+              ) : (
+                voucherTemplates.length > 0 ? (
+                  voucherTemplates.map((template) => {
+                    const discountText = template.discount_type === 'percentage'
+                      ? `Diskon ${Number(template.discount_value)}%`
+                      : `Potongan Rp ${Number(template.discount_value).toLocaleString()}`;
+                      
+                    const minSpendText = template.min_transaction 
+                      ? `Min. Transaksi: Rp ${Number(template.min_transaction).toLocaleString()}` 
+                      : 'Tanpa Minimum Belanja';
+
+                    const canRedeem = pointsData.points >= template.points_cost;
+
+                    return (
+                      <View key={template.id} style={[styles.catalogCard, !canRedeem && styles.catalogCardDisabled]}>
+                        <View style={styles.catalogCardHeader}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.catalogTitle}>{template.name}</Text>
+                            <Text style={styles.catalogCode}>{template.code}</Text>
+                          </View>
+                          <View style={styles.pointsCostBox}>
+                            <Text style={styles.pointsCostText}>{template.points_cost} Pts</Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.catalogDetails}>
+                          <View style={styles.catalogRow}>
+                            <Ionicons name="gift-outline" size={14} color={colors.primary} />
+                            <Text style={styles.catalogDetailVal}>{discountText} {template.max_discount ? `(Maks Rp ${Number(template.max_discount).toLocaleString()})` : ''}</Text>
+                          </View>
+                          <View style={styles.catalogRow}>
+                            <Ionicons name="card-outline" size={14} color={colors.primary} />
+                            <Text style={styles.catalogDetailVal}>{minSpendText}</Text>
+                          </View>
+                          <View style={styles.catalogRow}>
+                            <Ionicons name="calendar-outline" size={14} color={colors.primary} />
+                            <Text style={styles.catalogDetailVal}>Berlaku: {template.start_date} s.d {template.end_date}</Text>
+                          </View>
+                        </View>
+
+                        <TouchableOpacity 
+                          style={[styles.redeemBtn, !canRedeem && styles.redeemBtnDisabled]}
+                          disabled={!canRedeem}
+                          onPress={() => handleRedeemVoucher(template)}
+                        >
+                          <Text style={styles.redeemBtnText}>
+                            {canRedeem ? 'Tukarkan Points' : `Butuh ${template.points_cost - pointsData.points} Pts Lagi`}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })
+                ) : (
+                  <View style={styles.emptyContainer}>
+                    <MaterialCommunityIcons name="tag-outline" size={48} color={colors.mutedForeground} />
+                    <Text style={styles.emptyText}>Katalog voucher tidak tersedia</Text>
+                  </View>
+                )
+              )}
+            </ScrollView>
+          )}
+        </View>
+      )}
+
+      {/* 5. Profile Tab */}
+      {currentScreen === 'profile' && (
+        <ScrollView contentContainerStyle={styles.profileContainer} keyboardShouldPersistTaps="handled">
+          <View style={styles.profileHeaderCard}>
+            <TouchableOpacity 
+              style={styles.profileAvatarContainer}
+              onPress={handlePickAvatar}
+              disabled={isUploadingAvatar}
+              activeOpacity={0.8}
+            >
+              {user?.avatar_url ? (
+                <Image 
+                  source={{ uri: formatImageUrl(user.avatar_url) || '' }} 
+                  style={styles.profileAvatarImageLarge} 
+                />
+              ) : (
+                <View style={styles.profileAvatarLarge}>
+                  <Text style={styles.profileAvatarTextLarge}>
+                    {user?.name ? user.name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase() : 'C'}
+                  </Text>
+                </View>
+              )}
+              {isUploadingAvatar ? (
+                <View style={[styles.profileAvatarImageLarge, { position: 'absolute', top: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }]}>
+                  <ActivityIndicator color="#ffffff" />
+                </View>
+              ) : (
+                <View style={styles.avatarEditBadge}>
+                  <Ionicons name="camera" size={12} color="#ffffff" />
+                </View>
+              )}
+            </TouchableOpacity>
+            <Text style={styles.profileHeaderName}>{user?.name}</Text>
+            <Text style={styles.profileHeaderEmail}>{user?.email}</Text>
+            <View style={styles.profileRoleBadge}>
+              <Text style={styles.profileRoleBadgeText}>PELANGGAN MEMBER</Text>
+            </View>
+          </View>
+
+          {/* Theme customizer section */}
+          <View style={styles.profileCard}>
+            <Text style={styles.profileCardTitle}>Pilihan Tema Aplikasi</Text>
+            <View style={styles.themeToggleGroup}>
+              {(['system', 'light', 'dark'] as const).map((t) => (
+                <TouchableOpacity
+                  key={t}
+                  style={[
+                    styles.themeToggleBtn, 
+                    themeSetting === t && styles.themeToggleBtnActive
+                  ]}
+                  onPress={() => changeThemeSetting(t)}
+                >
+                  <Ionicons 
+                    name={t === 'system' ? 'phone-portrait-outline' : t === 'light' ? 'sunny-outline' : 'moon-outline'} 
+                    size={16} 
+                    color={themeSetting === t ? colors.primaryForeground : colors.mutedForeground} 
+                  />
+                  <Text style={[
+                    styles.themeToggleText,
+                    themeSetting === t && styles.themeToggleTextActive
+                  ]}>
+                    {t === 'system' ? 'System' : t === 'light' ? 'Light' : 'Dark'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.profileCard}>
+            <Text style={styles.profileCardTitle}>Detail Profil</Text>
+
+            <Text style={styles.inputLabel}>Nama Lengkap</Text>
+            <View style={styles.inputContainer}>
+              <Ionicons name="person" size={16} color={colors.mutedForeground} style={styles.inputIcon} />
+              <TextInput
+                style={styles.textInput}
+                placeholder="Name"
+                placeholderTextColor={colors.mutedForeground}
+                value={editName}
+                onChangeText={setEditName}
+              />
+            </View>
+
+            <Text style={styles.inputLabel}>Nomor WhatsApp</Text>
+            <View style={styles.inputContainer}>
+              <Ionicons name="logo-whatsapp" size={16} color={colors.mutedForeground} style={styles.inputIcon} />
+              <TextInput
+                style={styles.textInput}
+                placeholder="0812xxxx"
+                placeholderTextColor={colors.mutedForeground}
+                keyboardType="phone-pad"
+                value={editPhone}
+                onChangeText={setEditPhone}
+              />
+            </View>
+
+            <Text style={styles.inputLabel}>Alamat Pengiriman</Text>
+            <View style={[styles.inputContainer, { height: 90, alignItems: 'flex-start' }]}>
+              <Ionicons name="location" size={16} color={colors.mutedForeground} style={[styles.inputIcon, { marginTop: 10 }]} />
+              <TextInput
+                style={[styles.textInput, { height: 80, textAlignVertical: 'top' }]}
+                placeholder="Tulis alamat pengiriman lengkap..."
+                placeholderTextColor={colors.mutedForeground}
+                multiline
+                numberOfLines={3}
+                value={editAddress}
+                onChangeText={setEditAddress}
+              />
+            </View>
+
+            <TouchableOpacity 
+              style={styles.saveProfileBtn} 
+              onPress={handleSaveProfile}
+              disabled={isSavingProfile}
+            >
+              {isSavingProfile ? (
+                <ActivityIndicator color={colors.primaryForeground} />
+              ) : (
+                <Text style={styles.saveProfileBtnText}>Simpan Perubahan</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity 
+            style={styles.passwordModalBtn}
+            onPress={() => setIsPasswordModalOpen(true)}
+          >
+            <Ionicons name="key" size={18} color={colors.primary} />
+            <Text style={styles.passwordModalBtnText}>Ubah Password Akun</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+            <Ionicons name="log-out" size={18} color="#ffffff" />
+            <Text style={styles.logoutBtnText}>Keluar Dari Aplikasi</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
+
+      {/* Bottom Navigation */}
+      {currentScreen !== 'login' && (
+        <View style={styles.bottomNav}>
+          <TouchableOpacity
+            style={[styles.bottomNavItem, currentScreen === 'dashboard' && styles.bottomNavItemActive]}
+            onPress={() => setCurrentScreen('dashboard')}
+          >
+            <Ionicons name="list" size={20} color={currentScreen === 'dashboard' ? colors.primary : colors.mutedForeground} />
+            <Text style={[styles.bottomNavText, currentScreen === 'dashboard' && styles.bottomNavTextActive]}>Pelacakan</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.bottomNavItem, currentScreen === 'vouchers' && styles.bottomNavItemActive]}
+            onPress={() => setCurrentScreen('vouchers')}
+          >
+            <Ionicons name="ticket" size={20} color={currentScreen === 'vouchers' ? colors.primary : colors.mutedForeground} />
+            <Text style={[styles.bottomNavText, currentScreen === 'vouchers' && styles.bottomNavTextActive]}>Vouchers</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.bottomNavItem, currentScreen === 'profile' && styles.bottomNavItemActive]}
+            onPress={() => setCurrentScreen('profile')}
+          >
+            <Ionicons name="person" size={20} color={currentScreen === 'profile' ? colors.primary : colors.mutedForeground} />
+            <Text style={[styles.bottomNavText, currentScreen === 'profile' && styles.bottomNavTextActive]}>Profil</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* 1. Transaction Detail Modal */}
+      <Modal
+        visible={isTxDetailOpen}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsTxDetailOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {selectedTx && (
+              <View style={{ flex: 1 }}>
+                <View style={styles.modalHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.modalTitle}>{selectedTx.invoice_code}</Text>
+                    <Text style={styles.modalSubtitle}>{selectedTx.service?.service_name}</Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.closeModalBtn} 
+                    onPress={() => setIsTxDetailOpen(false)}
+                  >
+                    <Ionicons name="close" size={24} color={colors.foreground} />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView contentContainerStyle={styles.modalScroll}>
+                  
+                  {/* Stepper Status tracker */}
+                  <View style={styles.sectionCard}>
+                    <Text style={styles.sectionTitle}>Status Pengerjaan Cucian</Text>
+                    
+                    <View style={styles.stepperContainer}>
+                      {['antrian', 'dicuci', 'disetrika', 'siap diambil', 'diambil'].map((step, idx) => {
+                        const statuses = ['antrian', 'dicuci', 'disetrika', 'siap diambil', 'diambil'];
+                        const currentIdx = statuses.indexOf(selectedTx.status);
+                        const isCompleted = statuses.indexOf(step) <= currentIdx;
+                        const isActive = step === selectedTx.status;
+
+                        let stepLabel = '';
+                        let stepIcon = 'ellipse-outline';
+
+                        if (step === 'antrian') {
+                          stepLabel = 'Antrian (Queued)';
+                          stepIcon = 'time';
+                        } else if (step === 'dicuci') {
+                          stepLabel = 'Sedang Dicuci (Washing)';
+                          stepIcon = 'water';
+                        } else if (step === 'disetrika') {
+                          stepLabel = 'Sedang Disetrika (Ironing)';
+                          stepIcon = 'flash';
+                        } else if (step === 'siap diambil') {
+                          stepLabel = 'Siap Diambil (Ready)';
+                          stepIcon = 'checkmark-done';
+                        } else if (step === 'diambil') {
+                          stepLabel = 'Sudah Diambil (Delivered)';
+                          stepIcon = 'home';
+                        }
+
+                        return (
+                          <View key={step} style={styles.stepRow}>
+                            <View style={styles.stepLeft}>
+                              <View style={[
+                                styles.stepDot, 
+                                isCompleted && styles.stepDotCompleted,
+                                isActive && styles.stepDotActive
+                              ]}>
+                                <Ionicons 
+                                  name={stepIcon as any} 
+                                  size={14} 
+                                  color={isCompleted ? colors.primaryForeground : colors.mutedForeground} 
+                                />
+                              </View>
+                              {idx < 4 && (
+                                <View style={[
+                                  styles.stepLine, 
+                                  statuses.indexOf(statuses[idx + 1]) <= currentIdx && styles.stepLineCompleted
+                                ]} />
+                              )}
+                            </View>
+                            <View style={styles.stepRight}>
+                              <Text style={[
+                                  styles.stepLabelText,
+                                  isCompleted && styles.stepLabelTextCompleted,
+                                  isActive && styles.stepLabelTextActive
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {stepLabel}
+                              </Text>
+                              {selectedTx.logs?.find((l: any) => l.status === step) && (
+                                <Text style={styles.stepTimeText}>
+                                  {new Date(selectedTx.logs.find((l: any) => l.status === step).created_at).toLocaleTimeString('id-ID', {
+                                    hour: '2-digit', minute: '2-digit'
+                                  })}
+                                </Text>
+                              )}
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
+
+                  {/* Condition Images Gallery */}
+                  <View style={styles.sectionCard}>
+                    <Text style={styles.sectionTitle}>Foto Kondisi Baju Masuk</Text>
+                    {selectedTx.images && selectedTx.images.length > 0 ? (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryScroll}>
+                        {selectedTx.images.map((img: any) => {
+                          const imageUrl = img.image_path.startsWith('http') 
+                            ? img.image_path 
+                            : `${API_BASE}/storage/${img.image_path}`;
+                          
+                          return (
+                            <Image 
+                              key={img.id}
+                              source={{ uri: imageUrl }} 
+                              style={styles.galleryImage}
+                              resizeMode="cover"
+                            />
+                          );
+                        })}
+                      </ScrollView>
+                    ) : (
+                      <Text style={styles.noImagesText}>
+                        Tidak ada foto kondisi baju yang diunggah oleh admin.
+                      </Text>
+                    )}
+                  </View>
+
+                  {/* Summary details */}
+                  <View style={styles.sectionCard}>
+                    <Text style={styles.sectionTitle}>Ringkasan Transaksi</Text>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Jumlah Cucian</Text>
+                      <Text style={styles.detailValue}>{selectedTx.weight} {selectedTx.service?.unit || 'Kg'}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Harga Satuan</Text>
+                      <Text style={styles.detailValue}>Rp {Number(selectedTx.service?.price || 0).toLocaleString('id-ID')} / {selectedTx.service?.unit || 'Kg'}</Text>
+                    </View>
+
+                    <View style={styles.divider} />
+
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Subtotal</Text>
+                      <Text style={styles.detailValue}>Rp {Number(selectedTx.total_price).toLocaleString('id-ID')}</Text>
+                    </View>
+
+                    {(selectedTx.discount > 0) && (
+                      <View style={styles.detailRow}>
+                        <Text style={[styles.detailLabel, { color: colors.success }]}>Diskon (Voucher)</Text>
+                        <Text style={[styles.detailValue, { color: colors.success }]}>- Rp {Number(selectedTx.discount).toLocaleString('id-ID')}</Text>
+                      </View>
+                    )}
+
+                    {appliedVoucher && (
+                      <View style={styles.detailRow}>
+                        <Text style={[styles.detailLabel, { color: colors.success }]}>Diskon Baru</Text>
+                        <Text style={[styles.detailValue, { color: colors.success }]}>- Rp {Number(appliedVoucher.discount).toLocaleString('id-ID')}</Text>
+                      </View>
+                    )}
+
+                    <View style={styles.detailRow}>
+                      <Text style={[styles.detailLabel, { fontWeight: 'bold' }]}>Total Bayar</Text>
+                      <Text style={[styles.detailValue, { fontWeight: 'bold', fontSize: 16, color: colors.primary }]}>
+                        Rp {Number(
+                          selectedTx.total_price - 
+                          (selectedTx.discount || 0) - 
+                          (appliedVoucher ? appliedVoucher.discount : 0)
+                        ).toLocaleString('id-ID')}
+                      </Text>
+                    </View>
+
+                    <View style={styles.divider} />
+
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Metode Pembayaran</Text>
+                      <Text style={styles.detailValue}>{selectedTx.payment_method?.toUpperCase() || 'Belum Dipilih'}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Status Pembayaran</Text>
+                      <Text style={[
+                        styles.detailValue, 
+                        { color: selectedTx.payment_status === 'paid' ? colors.success : colors.danger, fontWeight: 'bold' }
+                      ]}>
+                        {selectedTx.payment_status === 'paid' ? 'LUNAS' : 'PENDING'}
+                      </Text>
+                    </View>
+
+                    {selectedTx.payment_status === 'paid' && (
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Waktu Pembayaran</Text>
+                        <Text style={styles.detailValue}>
+                          {selectedTx.paid_at ? new Date(selectedTx.paid_at).toLocaleString('id-ID') : '-'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Payment checkout form (ONLY if pending) */}
+                  {selectedTx.payment_status === 'pending' && (
+                    <View style={[styles.sectionCard, { borderColor: colors.primary, borderWidth: 1 }]}>
+                      <Text style={[styles.sectionTitle, { color: colors.primary }]}>Konfirmasi Pembayaran</Text>
+                      
+                      <Text style={styles.inputLabel}>Pilih Metode Pembayaran</Text>
+                      <View style={styles.paymentSelector}>
+                        {(['transfer', 'qris', 'cash'] as const).map((method) => (
+                          <TouchableOpacity
+                            key={method}
+                            style={[
+                              styles.payMethodBtn, 
+                              paymentMethod === method && styles.payMethodBtnActive
+                            ]}
+                            onPress={() => setPaymentMethod(method)}
+                          >
+                            <Text style={[
+                              styles.payMethodText,
+                              paymentMethod === method && styles.payMethodTextActive
+                            ]}>
+                              {method.toUpperCase()}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+
+                      {/* Voucher Redeem Input */}
+                      <Text style={styles.inputLabel}>Gunakan Kode Voucher (Opsional)</Text>
+                      <View style={styles.voucherCodeCheckContainer}>
+                        <TextInput
+                          style={styles.voucherCodeCheckInput}
+                          placeholder="Masukkan kode voucher..."
+                          placeholderTextColor={colors.mutedForeground}
+                          autoCapitalize="characters"
+                          value={voucherCodeInput}
+                          onChangeText={(text) => {
+                            setVoucherCodeInput(text);
+                            setAppliedVoucher(null);
+                            setVoucherError('');
+                          }}
+                        />
+                        <TouchableOpacity 
+                          style={styles.voucherCheckBtn} 
+                          onPress={checkVoucher}
+                          disabled={checkingVoucher}
+                        >
+                          {checkingVoucher ? (
+                            <ActivityIndicator size="small" color="#ffffff" />
+                          ) : (
+                            <Text style={styles.voucherCheckBtnText}>Gunakan</Text>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+
+                      {appliedVoucher && (
+                        <View style={styles.voucherSuccessBox}>
+                          <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+                          <Text style={styles.voucherSuccessText}>
+                            Diskon Rp {Number(appliedVoucher.discount).toLocaleString('id-ID')} berhasil diterapkan!
+                          </Text>
+                        </View>
+                      )}
+                      {voucherError ? (
+                        <View style={styles.voucherErrorBox}>
+                          <Ionicons name="alert-circle" size={16} color={colors.danger} />
+                          <Text style={styles.voucherErrorText}>{voucherError}</Text>
+                        </View>
+                      ) : null}
+
+                      {/* Payment Proof Selection */}
+                      {paymentMethod !== 'cash' && (
+                        <View style={{ marginTop: 15 }}>
+                          <Text style={styles.inputLabel}>Unggah Screenshot Bukti Bayar</Text>
+                          <TouchableOpacity 
+                            style={styles.proofPickerBtn}
+                            onPress={() => setShowProofPicker(true)}
+                          >
+                            {selectedProofBase64 ? (
+                              <View style={styles.proofPreviewContainer}>
+                                <Ionicons name="document-attach" size={24} color={colors.success} />
+                                <Text style={styles.proofPreviewText}>Bukti Bayar Dimuat (Siap Kirim)</Text>
+                              </View>
+                            ) : (
+                              <View style={styles.proofPickerPlaceholder}>
+                                <Ionicons name="image-outline" size={24} color={colors.mutedForeground} />
+                                <Text style={styles.proofPickerText}>Pilih File Bukti Pembayaran</Text>
+                              </View>
+                            )}
+                          </TouchableOpacity>
+                        </View>
+                      )}
+
+                      <TouchableOpacity 
+                        style={[
+                          styles.submitPaymentBtn,
+                          paymentMethod !== 'cash' && !selectedProofBase64 && styles.submitPaymentBtnDisabled
+                        ]}
+                        disabled={isSubmittingPayment || (paymentMethod !== 'cash' && !selectedProofBase64)}
+                        onPress={submitPaymentProof}
+                      >
+                        {isSubmittingPayment ? (
+                          <ActivityIndicator color={colors.primaryForeground} />
+                        ) : (
+                          <Text style={styles.submitPaymentBtnText}>Bayar & Konfirmasi Sekarang</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </ScrollView>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* 2. Mock Payment Proof Picker Modal */}
+      <Modal
+        visible={showProofPicker}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowProofPicker(false)}
+      >
+        <View style={styles.proofPickerOverlay}>
+          <View style={styles.proofPickerBox}>
+            <Text style={styles.proofPickerTitle}>Simulasi Unggah Bukti Bayar</Text>
+            <Text style={styles.proofPickerDesc}>
+              Pilih salah satu bukti bayar simulasi di bawah ini untuk memproses verifikasi di backend:
+            </Text>
+
+            <TouchableOpacity 
+              style={styles.mockOption}
+              onPress={() => {
+                setSelectedProofBase64(MOCK_PROOF_BASE64);
+                setShowProofPicker(false);
+                showToast('Bukti Transfer BCA dipilih!', 'success');
+              }}
+            >
+              <Ionicons name="receipt" size={32} color={colors.primary} />
+              <View style={{ marginLeft: 15, flex: 1 }}>
+                <Text style={styles.mockOptionName}>Struk Transfer Bank BCA (Mock)</Text>
+                <Text style={styles.mockOptionDetail}>Status: Sukses - Rp {Number(selectedTx?.total_price || 0).toLocaleString('id-ID')}</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.mockOption}
+              onPress={() => {
+                setSelectedProofBase64(MOCK_PROOF_BASE64);
+                setShowProofPicker(false);
+                showToast('Bukti QRIS dipilih!', 'success');
+              }}
+            >
+              <Ionicons name="qr-code" size={32} color={colors.success} />
+              <View style={{ marginLeft: 15, flex: 1 }}>
+                <Text style={styles.mockOptionName}>Screenshot Pembayaran QRIS (Mock)</Text>
+                <Text style={styles.mockOptionDetail}>Status: Sukses - ID Ref: QR-83921</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.cancelProofPickerBtn}
+              onPress={() => setShowProofPicker(false)}
+            >
+              <Text style={styles.cancelProofPickerText}>Batal</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 3. Change Password Modal */}
+      <Modal
+        visible={isPasswordModalOpen}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setIsPasswordModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.smallModalContent}>
+            <Text style={styles.modalTitle}>Ubah Password Akun</Text>
+            
+            <Text style={styles.inputLabel}>Password Saat Ini</Text>
+            <View style={styles.inputContainer}>
+              <Ionicons name="lock-open" size={18} color={colors.mutedForeground} style={styles.inputIcon} />
+              <TextInput
+                style={styles.textInput}
+                placeholder="Masukkan password saat ini..."
+                placeholderTextColor={colors.mutedForeground}
+                secureTextEntry
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+              />
+            </View>
+
+            <Text style={styles.inputLabel}>Password Baru</Text>
+            <View style={styles.inputContainer}>
+              <Ionicons name="lock-closed" size={18} color={colors.mutedForeground} style={styles.inputIcon} />
+              <TextInput
+                style={styles.textInput}
+                placeholder="Minimal 8 karakter..."
+                placeholderTextColor={colors.mutedForeground}
+                secureTextEntry
+                value={newPassword}
+                onChangeText={setNewPassword}
+              />
+            </View>
+
+            <Text style={styles.inputLabel}>Ulangi Password Baru</Text>
+            <View style={styles.inputContainer}>
+              <Ionicons name="checkmark-circle-outline" size={18} color={colors.mutedForeground} style={styles.inputIcon} />
+              <TextInput
+                style={styles.textInput}
+                placeholder="Ketik ulang password baru..."
+                placeholderTextColor={colors.mutedForeground}
+                secureTextEntry
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+              />
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.cancelBtn}
+                onPress={() => setIsPasswordModalOpen(false)}
+                disabled={isSavingPassword}
+              >
+                <Text style={styles.cancelBtnText}>Batal</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.saveBtn}
+                onPress={handleChangePassword}
+                disabled={isSavingPassword}
+              >
+                {isSavingPassword ? (
+                  <ActivityIndicator color={colors.primaryForeground} size="small" />
+                ) : (
+                  <Text style={styles.saveBtnText}>Simpan</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 4. Global Toast Notification */}
+      <Animated.View 
+        pointerEvents={toastMounted ? "auto" : "none"}
+        style={[
+          styles.toastContainer,
+          toastType === 'success' && styles.toastSuccess,
+          toastType === 'error' && styles.toastError,
+          toastType === 'info' && styles.toastInfo,
+          {
+            opacity: toastOpacity,
+            transform: [{ translateY: toastTranslateY }],
+            elevation: toastMounted ? 6 : 0,
+            shadowOpacity: toastMounted ? 0.2 : 0,
+            paddingHorizontal: 0,
+            paddingVertical: 0,
+          }
+        ]}
+      >
+        <TouchableOpacity 
+          activeOpacity={0.9}
+          onPress={hideToast}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            width: '100%',
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+          }}
+        >
+          <Ionicons 
+            name={toastType === 'success' ? 'checkmark-circle' : toastType === 'error' ? 'alert-circle' : 'information-circle'} 
+            size={18} 
+            color="#ffffff" 
+          />
+          <Text style={styles.toastText}>{toastMessage || ''}</Text>
+        </TouchableOpacity>
+      </Animated.View>
+
+    </SafeAreaView>
+  );
+}
+
+// StyleSheet Factory to support dynamic theme switching instantly
+const createStyles = (colors: typeof LIGHT_COLORS, isDark: boolean) => StyleSheet.create({
+  safeContainer: {
+    fontFamily: 'Geist-Regular',
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  walkthroughContainer: {
+    flex: 1,
+    padding: 24,
+    justifyContent: 'space-between',
+  },
+  skipBtn: {
+    alignSelf: 'flex-end',
+    padding: 8,
+    marginTop: Platform.OS === 'ios' ? 10 : 20,
+  },
+  skipBtnText: {
+    fontFamily: 'Geist-Medium',
+    fontSize: 14,
+    color: colors.mutedForeground,
+  },
+  walkthroughContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  walkthroughImage: {
+    width: width - 48,
+    height: height * 0.38,
+    borderRadius: 16,
+    marginBottom: 40,
+  },
+  walkthroughTitle: {
+    fontFamily: 'Geist-Bold',
+    fontSize: 24,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  walkthroughDesc: {
+    fontFamily: 'Geist-Regular',
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 24,
+    paddingHorizontal: 10,
+  },
+  walkthroughFooter: {
+    marginBottom: Platform.OS === 'ios' ? 20 : 30,
+    alignItems: 'center',
+    width: '100%',
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  dot: {
+    height: 8,
+    width: 8,
+    borderRadius: 4,
+    marginHorizontal: 4,
+  },
+  nextBtn: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 52,
+    width: '100%',
+    borderRadius: 12,
+  },
+  nextBtnText: {
+    fontFamily: 'Geist-Bold',
+    fontSize: 16,
+  },
+  screenContainer: {
+    flex: 1,
+  },
+  loaderCenter: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  // Custom Toast Style
+  toastContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 70 : 40,
+    left: 20,
+    right: 20,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 6,
+    zIndex: 9999,
+  },
+  toastText: {
+    color: '#ffffff',
+    marginLeft: 10,
+    fontFamily: 'Geist-SemiBold',
+    fontSize: 13,
+    flex: 1,
+  },
+  toastSuccess: {
+    backgroundColor: 'rgba(16, 185, 129, 0.9)',
+  },
+  toastError: {
+    backgroundColor: 'rgba(239, 68, 68, 0.9)',
+  },
+  toastInfo: {
+    backgroundColor: 'rgba(59, 130, 246, 0.9)',
+  },
+
+  // Header styles
+  header: {
+    fontFamily: 'Geist-Regular',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    backgroundColor: colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.cardBorder,
+  },
+  headerProfile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  headerLogoIcon: {
+    width: 32,
+    height: 32,
+    marginRight: 10,
+  },
+  headerGreeting: {
+    fontSize: 10,
+    color: colors.mutedForeground,
+    fontFamily: 'Geist-Medium',
+  },
+  headerName: {
+    fontSize: 14,
+    fontFamily: 'Geist-Bold',
+    color: colors.foreground,
+  },
+  pointsBadge: {
+    fontFamily: 'Geist-Regular',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: isDark ? 'rgba(251,191,36,0.12)' : 'rgba(251,191,36,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.25)',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  pointsBadgeText: {
+    color: '#fbbf24',
+    fontSize: 12,
+    fontFamily: 'Geist-Bold',
+    marginLeft: 4,
+  },
+
+  inputContainer: {
+    fontFamily: 'Geist-Regular',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    height: 40,
+  },
+  inputIcon: {
+    fontFamily: 'Geist-Regular',
+    marginRight: 8,
+  },
+  textInput: {
+    fontFamily: 'Geist-Regular',
+    flex: 1,
+    color: colors.foreground,
+    fontSize: 13,
+    height: '100%',
+  },
+
+  // Login Screen styles
+  ambientGlow: {
+    position: 'absolute',
+    top: '20%',
+    left: '-20%',
+    width: 500,
+    height: 500,
+    borderRadius: 250,
+    backgroundColor: isDark ? 'rgba(59, 130, 246, 0.04)' : 'rgba(59, 130, 246, 0.06)',
+    zIndex: 1,
+  },
+  floatingThemeToggle: {
+    fontFamily: 'Geist-Regular',
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 30,
+    right: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    backgroundColor: colors.card,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  brandOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(9, 9, 11, 0.65)',
+  },
+  brandContainer: {
+    flex: 1,
+    padding: 24,
+    justifyContent: 'space-between',
+  },
+  brandHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: Platform.OS === 'ios' ? 10 : 20,
+  },
+  brandLogoImageLarge: {
+    height: 48,
+    width: 140,
+  },
+  brandThemeToggle: {
+    padding: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 8,
+  },
+  brandContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  brandMottoBox: {
+    marginBottom: 40,
+  },
+  brandMottoTitle: {
+    fontFamily: 'Geist-Black',
+    fontSize: 34,
+    color: '#ffffff',
+    lineHeight: 44,
+    marginBottom: 16,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  brandMottoSubtitle: {
+    fontFamily: 'Geist-Medium',
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.85)',
+    lineHeight: 24,
+    maxWidth: 280,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  brandFooter: {
+    marginBottom: Platform.OS === 'ios' ? 10 : 20,
+    width: '100%',
+  },
+  brandLoginBtn: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 52,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  brandLoginBtnText: {
+    fontFamily: 'Geist-Bold',
+    fontSize: 16,
+    color: '#09090b',
+  },
+  brandCopyrightText: {
+    fontFamily: 'Geist-Regular',
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.4)',
+    textAlign: 'center',
+    marginTop: 24,
+  },
+  drawerOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    justifyContent: 'flex-end',
+  },
+  drawerDismissArea: {
+    flex: 1,
+  },
+  drawerContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: 1,
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    maxHeight: height * 0.75,
+  },
+  drawerHandleBar: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  drawerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  drawerTitle: {
+    fontFamily: 'Geist-Bold',
+    fontSize: 20,
+  },
+  drawerCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  drawerScrollContent: {
+    paddingBottom: 20,
+  },
+  loginErrorBox: {
+    backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.08)',
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  loginErrorText: {
+    color: colors.danger,
+    fontSize: 13,
+    fontFamily: 'Geist-Medium',
+    textAlign: 'center',
+  },
+  inputFieldGroup: {
+    fontFamily: 'Geist-Regular',
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 10, // text-xs
+    fontFamily: 'Geist-Bold',
+    color: colors.mutedForeground,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 6,
+  },
+  inputWrapper: {
+    fontFamily: 'Geist-Regular',
+    position: 'relative',
+    height: 40,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 8, // rounded-lg
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  inputFieldIcon: {
+    fontFamily: 'Geist-Regular',
+    position: 'absolute',
+    left: 12,
+    top: 11,
+    zIndex: 5,
+  },
+  inputField: {
+    fontFamily: 'Geist-Regular',
+    flex: 1,
+    height: '100%',
+    paddingLeft: 40,
+    paddingRight: 12,
+    color: colors.foreground,
+    fontSize: 14,
+  },
+  loginButton: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: colors.primary,
+    borderRadius: 8, // rounded-lg
+    height: 42,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 24, // mt-6
+  },
+  loginButtonText: {
+    color: colors.primaryForeground,
+    fontSize: 14,
+    fontFamily: 'Geist-Bold',
+  },
+
+  // Dashboard Styles
+  welcomeBanner: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+  },
+  bannerTitle: {
+    fontSize: 18,
+    fontFamily: 'Geist-Bold',
+    color: colors.foreground,
+  },
+  bannerSubtitle: {
+    fontFamily: 'Geist-Regular',
+    fontSize: 11,
+    color: colors.mutedForeground,
+    marginTop: 2,
+  },
+  refreshBtn: {
+    fontFamily: 'Geist-Regular',
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: colors.card,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  dashboardPointsCard: {
+    fontFamily: 'Geist-Regular',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: 8,
+    padding: 14,
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  pointsLabel: {
+    fontSize: 10,
+    color: colors.mutedForeground,
+    textTransform: 'uppercase',
+    fontFamily: 'Geist-Medium',
+  },
+  pointsValue: {
+    fontSize: 20,
+    fontFamily: 'Geist-Bold',
+    color: colors.foreground,
+    marginTop: 2,
+  },
+  pointsAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  pointsActionText: {
+    color: colors.success,
+    fontSize: 11,
+    fontFamily: 'Geist-Bold',
+    marginRight: 3,
+  },
+
+  // Filter Tabs
+  filterTabs: {
+    fontFamily: 'Geist-Regular',
+    flexDirection: 'row',
+    backgroundColor: colors.card,
+    borderRadius: 6,
+    padding: 3,
+    marginHorizontal: 20,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  filterTab: {
+    flex: 1,
+    paddingVertical: 6,
+    alignItems: 'center',
+    borderRadius: 4,
+  },
+  filterTabActive: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: colors.primary,
+  },
+  filterTabText: {
+    fontSize: 12,
+    fontFamily: 'Geist-SemiBold',
+    color: colors.mutedForeground,
+  },
+  filterTabTextActive: {
+    fontFamily: 'Geist-Regular',
+    color: colors.primaryForeground,
+  },
+
+  // Transactions List Scroll
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  txCard: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: colors.card,
+    borderRadius: 8,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  txCardHeader: {
+    fontFamily: 'Geist-Regular',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.cardBorder,
+    paddingBottom: 8,
+    marginBottom: 8,
+  },
+  invoiceCode: {
+    fontSize: 13,
+    
+    color: colors.foreground,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  statusBadge: {
+    fontFamily: 'Geist-Regular',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  statusBadgeText: {
+    fontSize: 9,
+    fontFamily: 'Geist-Bold',
+  },
+  txCardBody: {
+    marginBottom: 10,
+  },
+  txInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  txInfoText: {
+    fontFamily: 'Geist-Regular',
+    fontSize: 12,
+    color: colors.foreground,
+    marginLeft: 6,
+  },
+  txCardFooter: {
+    fontFamily: 'Geist-Regular',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: colors.cardBorder,
+    paddingTop: 8,
+  },
+  priceLabel: {
+    fontFamily: 'Geist-Regular',
+    fontSize: 9,
+    color: colors.mutedForeground,
+  },
+  priceValue: {
+    fontSize: 13,
+    fontFamily: 'Geist-Bold',
+    color: colors.primary,
+  },
+  payBadge: {
+    fontFamily: 'Geist-Regular',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  payBadgeText: {
+    fontSize: 10,
+    fontFamily: 'Geist-Bold',
+  },
+
+  // Empty List
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 50,
+  },
+  emptyText: {
+    color: colors.mutedForeground,
+    fontSize: 14,
+    fontFamily: 'Geist-SemiBold',
+    marginTop: 10,
+  },
+  emptyDesc: {
+    fontFamily: 'Geist-Regular',
+    color: colors.mutedForeground,
+    fontSize: 11,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+
+  // Bottom Navigation Bar
+  bottomNav: {
+    fontFamily: 'Geist-Regular',
+    flexDirection: 'row',
+    height: 56,
+    backgroundColor: colors.card,
+    borderTopWidth: 1,
+    borderTopColor: colors.cardBorder,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  bottomNavItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    height: '100%',
+  },
+  bottomNavItemActive: {
+    fontFamily: 'Geist-Regular',
+    borderTopWidth: 2,
+    borderTopColor: colors.primary,
+  },
+  bottomNavText: {
+    fontFamily: 'Geist-Regular',
+    fontSize: 10,
+    color: colors.mutedForeground,
+    marginTop: 2,
+  },
+  bottomNavTextActive: {
+    color: colors.primary,
+    fontFamily: 'Geist-Bold',
+  },
+
+  // Vouchers Tabs
+  voucherSubTabs: {
+    fontFamily: 'Geist-Regular',
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.cardBorder,
+    backgroundColor: colors.card,
+  },
+  voucherSubTab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  voucherSubTabActive: {
+    fontFamily: 'Geist-Regular',
+    borderBottomWidth: 2,
+    borderBottomColor: colors.primary,
+  },
+  voucherSubTabText: {
+    fontSize: 13,
+    color: colors.mutedForeground,
+    fontFamily: 'Geist-SemiBold',
+  },
+  voucherSubTabTextActive: {
+    color: colors.primary,
+    fontFamily: 'Geist-Bold',
+  },
+
+  // Voucher card styles
+  voucherCard: {
+    fontFamily: 'Geist-Regular',
+    flexDirection: 'row',
+    backgroundColor: colors.card,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    overflow: 'hidden',
+    height: 98,
+  },
+  voucherSidePattern: {
+    fontFamily: 'Geist-Regular',
+    width: 48,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  voucherCardDetails: {
+    flex: 1,
+    padding: 10,
+    justifyContent: 'space-between',
+  },
+  voucherName: {
+    fontSize: 13,
+    fontFamily: 'Geist-Bold',
+    color: colors.foreground,
+  },
+  voucherDetailText: {
+    fontSize: 12,
+    color: colors.success,
+    fontFamily: 'Geist-SemiBold',
+  },
+  codeContainer: {
+    fontFamily: 'Geist-Regular',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    alignSelf: 'flex-start',
+    borderWidth: 0.5,
+    borderColor: colors.cardBorder,
+  },
+  voucherCodeText: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    color: colors.foreground,
+    fontSize: 11,
+    
+  },
+  copyBtn: {
+    fontFamily: 'Geist-Regular',
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 10,
+    borderLeftWidth: 1,
+    borderLeftColor: colors.cardBorder,
+    paddingLeft: 6,
+  },
+  copyBtnText: {
+    color: colors.primary,
+    fontSize: 9,
+    fontFamily: 'Geist-Bold',
+    marginLeft: 2,
+  },
+  voucherExpiry: {
+    fontFamily: 'Geist-Regular',
+    fontSize: 9,
+    color: colors.mutedForeground,
+  },
+
+  // Voucher Catalog card styles
+  catalogCard: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: colors.card,
+    borderRadius: 8,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  catalogCardDisabled: {
+    opacity: 0.65,
+  },
+  catalogCardHeader: {
+    fontFamily: 'Geist-Regular',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.cardBorder,
+    paddingBottom: 8,
+    marginBottom: 8,
+  },
+  catalogTitle: {
+    fontSize: 13,
+    fontFamily: 'Geist-Bold',
+    color: colors.foreground,
+  },
+  catalogCode: {
+    fontSize: 9,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    color: colors.primary,
+    
+    marginTop: 2,
+  },
+  pointsCostBox: {
+    backgroundColor: isDark ? 'rgba(16,185,129,0.12)' : 'rgba(16,185,129,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(16,185,129,0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  pointsCostText: {
+    color: colors.success,
+    fontFamily: 'Geist-Bold',
+    fontSize: 11,
+  },
+  catalogDetails: {
+    marginBottom: 10,
+  },
+  catalogRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  catalogDetailVal: {
+    fontFamily: 'Geist-Regular',
+    fontSize: 11,
+    color: colors.foreground,
+    marginLeft: 6,
+  },
+  redeemBtn: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: colors.success,
+    borderRadius: 6,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  redeemBtnDisabled: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: colors.disabled,
+  },
+  redeemBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontFamily: 'Geist-Bold',
+  },
+
+  // Profile page styles
+  profileContainer: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  profileHeaderCard: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: colors.card,
+    borderRadius: 8,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  profileAvatarContainer: {
+    position: 'relative',
+    marginBottom: 10,
+  },
+  profileAvatarImageLarge: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  avatarEditBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: colors.primary,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.card,
+  },
+  profileAvatarLarge: {
+    fontFamily: 'Geist-Regular',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileAvatarTextLarge: {
+    color: colors.primaryForeground,
+    fontSize: 24,
+    fontFamily: 'Geist-Bold',
+  },
+  profileHeaderName: {
+    color: colors.foreground,
+    fontSize: 18,
+    fontFamily: 'Geist-Bold',
+  },
+  profileHeaderEmail: {
+    fontFamily: 'Geist-Regular',
+    color: colors.mutedForeground,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  profileRoleBadge: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: isDark ? 'rgba(84,183,242,0.12)' : 'rgba(59,130,246,0.1)',
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(84,183,242,0.25)' : 'rgba(59,130,246,0.2)',
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginTop: 8,
+  },
+  profileRoleBadgeText: {
+    color: colors.primary,
+    fontFamily: 'Geist-Bold',
+    fontSize: 9,
+    letterSpacing: 0.5,
+  },
+  profileCard: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: colors.card,
+    borderRadius: 8,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    marginBottom: 12,
+  },
+  profileCardTitle: {
+    color: colors.foreground,
+    fontSize: 14,
+    fontFamily: 'Geist-Bold',
+    marginBottom: 10,
+  },
+  themeToggleGroup: {
+    fontFamily: 'Geist-Regular',
+    flexDirection: 'row',
+    backgroundColor: colors.background,
+    padding: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  themeToggleBtn: {
+    fontFamily: 'Geist-Regular',
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 4,
+  },
+  themeToggleBtnActive: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: colors.primary,
+  },
+  themeToggleText: {
+    color: colors.mutedForeground,
+    fontSize: 11,
+    fontFamily: 'Geist-SemiBold',
+    marginLeft: 4,
+  },
+  themeToggleTextActive: {
+    color: colors.primaryForeground,
+    fontFamily: 'Geist-Bold',
+  },
+  saveProfileBtn: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: colors.primary,
+    borderRadius: 6,
+    height: 38,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  saveProfileBtnText: {
+    color: colors.primaryForeground,
+    fontFamily: 'Geist-Bold',
+    fontSize: 13,
+  },
+  passwordModalBtn: {
+    fontFamily: 'Geist-Regular',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.card,
+    borderColor: colors.cardBorder,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  passwordModalBtnText: {
+    color: colors.primary,
+    fontFamily: 'Geist-Bold',
+    fontSize: 13,
+    marginLeft: 6,
+  },
+  logoutBtn: {
+    fontFamily: 'Geist-Regular',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.danger,
+    borderRadius: 8,
+    paddingVertical: 12,
+  },
+  logoutBtnText: {
+    color: '#ffffff',
+    fontFamily: 'Geist-Bold',
+    fontSize: 13,
+    marginLeft: 6,
+  },
+
+  // Modal Overlays
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15,23,42,0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    height: height * 0.85,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+    borderTopWidth: 1,
+    borderTopColor: colors.cardBorder,
+  },
+  modalHeader: {
+    fontFamily: 'Geist-Regular',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.cardBorder,
+    backgroundColor: colors.card,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontFamily: 'Geist-Bold',
+    color: colors.foreground,
+  },
+  modalSubtitle: {
+    fontFamily: 'Geist-Regular',
+    fontSize: 11,
+    color: colors.mutedForeground,
+    marginTop: 2,
+  },
+  closeModalBtn: {
+    fontFamily: 'Geist-Regular',
+    padding: 2,
+  },
+  modalScroll: {
+    padding: 16,
+  },
+  sectionCard: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: colors.card,
+    borderRadius: 8,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontFamily: 'Geist-Bold',
+    color: colors.foreground,
+    marginBottom: 10,
+  },
+
+  // Stepper styles
+  stepperContainer: {
+    paddingLeft: 6,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    minHeight: 48,
+  },
+  stepLeft: {
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  stepDot: {
+    fontFamily: 'Geist-Regular',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.background,
+    borderWidth: 1.5,
+    borderColor: colors.cardBorder,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  stepDotActive: {
+    fontFamily: 'Geist-Regular',
+    borderColor: colors.primary,
+    backgroundColor: colors.background,
+  },
+  stepDotCompleted: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  stepLine: {
+    fontFamily: 'Geist-Regular',
+    width: 2,
+    flex: 1,
+    backgroundColor: colors.cardBorder,
+    marginVertical: -2,
+    zIndex: 1,
+  },
+  stepLineCompleted: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: colors.primary,
+  },
+  stepRight: {
+    flex: 1,
+    paddingBottom: 12,
+    justifyContent: 'center',
+  },
+  stepLabelText: {
+    fontSize: 12,
+    fontFamily: 'Geist-Medium',
+    color: colors.mutedForeground,
+  },
+  stepLabelTextActive: {
+    color: colors.primary,
+    fontFamily: 'Geist-Bold',
+  },
+  stepLabelTextCompleted: {
+    color: colors.foreground,
+    fontFamily: 'Geist-SemiBold',
+  },
+  stepTimeText: {
+    fontFamily: 'Geist-Regular',
+    fontSize: 9,
+    color: colors.mutedForeground,
+    marginTop: 1,
+  },
+
+  // Condition Images Gallery
+  galleryScroll: {
+    paddingVertical: 2,
+  },
+  galleryImage: {
+    fontFamily: 'Geist-Regular',
+    width: 120,
+    height: 90,
+    borderRadius: 6,
+    marginRight: 8,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  noImagesText: {
+    fontFamily: 'Geist-Regular',
+    color: colors.mutedForeground,
+    fontSize: 11,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: 10,
+  },
+
+  // Detail item summary rows
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  detailLabel: {
+    fontFamily: 'Geist-Regular',
+    fontSize: 12,
+    color: colors.mutedForeground,
+  },
+  detailValue: {
+    fontFamily: 'Geist-Regular',
+    fontSize: 12,
+    color: colors.foreground,
+  },
+  divider: {
+    fontFamily: 'Geist-Regular',
+    height: 1,
+    backgroundColor: colors.cardBorder,
+    marginVertical: 8,
+  },
+
+  // Checkout form styling
+  paymentSelector: {
+    fontFamily: 'Geist-Regular',
+    flexDirection: 'row',
+    backgroundColor: colors.background,
+    padding: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    marginBottom: 12,
+  },
+  payMethodBtn: {
+    fontFamily: 'Geist-Regular',
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 6,
+  },
+  payMethodBtnActive: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: colors.primary,
+  },
+  payMethodText: {
+    fontSize: 11,
+    fontFamily: 'Geist-Bold',
+    color: colors.mutedForeground,
+  },
+  payMethodTextActive: {
+    fontFamily: 'Geist-Regular',
+    color: colors.primaryForeground,
+  },
+
+  // Voucher apply code
+  voucherCodeCheckContainer: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  voucherCodeCheckInput: {
+    fontFamily: 'Geist-Regular',
+    flex: 1,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderTopLeftRadius: 6,
+    borderBottomLeftRadius: 6,
+    paddingHorizontal: 10,
+    color: colors.foreground,
+    fontSize: 12,
+    height: 38,
+  },
+  voucherCheckBtn: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: colors.primary,
+    borderTopRightRadius: 6,
+    borderBottomRightRadius: 6,
+    paddingHorizontal: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  voucherCheckBtnText: {
+    color: colors.primaryForeground,
+    fontFamily: 'Geist-Bold',
+    fontSize: 12,
+  },
+  voucherSuccessBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: isDark ? 'rgba(16,185,129,0.12)' : 'rgba(16,185,129,0.08)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(16,185,129,0.2)',
+    borderRadius: 6,
+    padding: 8,
+    marginBottom: 8,
+  },
+  voucherSuccessText: {
+    color: colors.success,
+    fontSize: 11,
+    fontFamily: 'Geist-Medium',
+    marginLeft: 4,
+    flex: 1,
+  },
+  voucherErrorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: isDark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.08)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(239,68,68,0.2)',
+    borderRadius: 6,
+    padding: 8,
+    marginBottom: 8,
+  },
+  voucherErrorText: {
+    color: colors.danger,
+    fontSize: 11,
+    fontFamily: 'Geist-Medium',
+    marginLeft: 4,
+    flex: 1,
+  },
+
+  // Proof Picker Btn
+  proofPickerBtn: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.primary,
+    borderRadius: 6,
+    padding: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  proofPickerPlaceholder: {
+    alignItems: 'center',
+  },
+  proofPickerText: {
+    fontFamily: 'Geist-Regular',
+    color: colors.mutedForeground,
+    fontSize: 11,
+    marginTop: 4,
+  },
+  proofPreviewContainer: {
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  proofPreviewText: {
+    color: colors.success,
+    fontFamily: 'Geist-Bold',
+    fontSize: 11,
+    marginLeft: 6,
+  },
+
+  // Submit payment checkout
+  submitPaymentBtn: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: colors.success,
+    borderRadius: 6,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  submitPaymentBtnDisabled: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: colors.disabled,
+  },
+  submitPaymentBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontFamily: 'Geist-Bold',
+  },
+
+  // Mock proof picker overlay
+  proofPickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15,23,42,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  proofPickerBox: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: colors.card,
+    borderRadius: 8,
+    padding: 20,
+    width: '100%',
+    maxWidth: 360,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  proofPickerTitle: {
+    fontSize: 14,
+    fontFamily: 'Geist-Bold',
+    color: colors.foreground,
+    textAlign: 'center',
+  },
+  proofPickerDesc: {
+    fontFamily: 'Geist-Regular',
+    fontSize: 11,
+    color: colors.mutedForeground,
+    textAlign: 'center',
+    marginVertical: 10,
+    lineHeight: 14,
+  },
+  mockOption: {
+    fontFamily: 'Geist-Regular',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 6,
+    padding: 10,
+    marginBottom: 10,
+  },
+  mockOptionName: {
+    color: colors.foreground,
+    fontFamily: 'Geist-Bold',
+    fontSize: 12,
+  },
+  mockOptionDetail: {
+    fontFamily: 'Geist-Regular',
+    color: colors.mutedForeground,
+    fontSize: 9,
+    marginTop: 1,
+  },
+  cancelProofPickerBtn: {
+    fontFamily: 'Geist-Regular',
+    alignItems: 'center',
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  cancelProofPickerText: {
+    color: colors.danger,
+    fontFamily: 'Geist-Bold',
+    fontSize: 13,
+  },
+
+  // Small Modals (e.g. Change Password)
+  smallModalContent: {
+    fontFamily: 'Geist-Regular',
+    backgroundColor: colors.card,
+    borderRadius: 8,
+    padding: 18,
+    marginHorizontal: 16,
+    marginBottom: height * 0.15,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  modalActions: {
+    fontFamily: 'Geist-Regular',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.cardBorder,
+    paddingTop: 12,
+  },
+  cancelBtn: {
+    fontFamily: 'Geist-Regular',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: colors.background,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  cancelBtnText: {
+    color: colors.foreground,
+    fontSize: 12,
+    fontFamily: 'Geist-SemiBold',
+  },
+  saveBtn: {
+    fontFamily: 'Geist-Regular',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 72,
+  },
+  saveBtnText: {
+    color: colors.primaryForeground,
+    fontSize: 12,
+    fontFamily: 'Geist-Bold',
+  }
+});

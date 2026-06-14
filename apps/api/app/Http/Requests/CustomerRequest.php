@@ -27,7 +27,7 @@ class CustomerRequest extends FormRequest
             'phone' => ['required', 'string', 'max:15'],
             'address' => ['required', 'string'],
             'birth_date' => ['nullable', 'date'],
-            'religion' => ['nullable', 'string', 'max:50'],
+            'religion' => ['nullable', 'string', 'in:Islam,Kristen Protestan,Kristen Katolik,Hindu,Buddha,Khonghucu'],
             'gender' => ['nullable', 'in:L,P'],
         ];
 

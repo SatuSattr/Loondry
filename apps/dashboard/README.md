@@ -11,6 +11,7 @@ A modern, high-performance laundry Point of Sales (POS) management panel built w
 * **Customer Management**: Profile registries, tracking phone numbers, and managing accumulated loyalty points.
 * **Loyalty & Vouchers**: Set point-exchange voucher templates and review redemption logs.
 * **Service Master Catalog**: Manage washing/dry cleaning service types, unit types, and pricing.
+* **Broadcast Notifications**: Target and dispatch notification campaigns to customer segments. Choose between In-App Inbox, Mobile Push Alert, or both, filter by demographics (gender, religion, age), and attach custom horizontal banner images (under 2MB).
 * **Seamless Navigation**: Zero-latency page switching powered by a custom client-side prefetching and caching layer.
 * **Dark Mode**: Complete light and dark mode styling with automatic theme persistence.
 

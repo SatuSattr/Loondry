@@ -255,6 +255,40 @@ test('admin cannot complete transaction if payment is pending', function () {
     $response->assertStatus(422);
 });
 
+test('admin status update to siap diambil sends notification to customer', function () {
+    $this->actingAs($this->admin, 'sanctum');
+
+    $transaction = Transaction::create([
+        'invoice_code' => 'LND-200',
+        'admin_id' => $this->admin->id,
+        'customer_id' => $this->customer->id,
+        'service_id' => $this->service->id,
+        'weight' => 2.5,
+        'total_price' => 20000,
+        'status' => 'antrian',
+        'payment_method' => 'cash',
+        'payment_status' => 'pending',
+    ]);
+
+    $response = $this->putJson("/api/transactions/{$transaction->id}/status", [
+        'status' => 'siap diambil',
+    ]);
+
+    $response->assertStatus(200);
+
+    // Assert a notification was created for the customer user
+    $this->assertDatabaseHas('notifications', [
+        'user_id' => $this->customer_user->id,
+        'title' => 'Pesanan Siap Diambil!',
+    ]);
+
+    $notification = \App\Models\Notification::where('user_id', $this->customer_user->id)->latest()->first();
+    expect($notification->content)->toContain($this->service->service_name);
+    expect($notification->content)->toContain('2.5');
+    expect($notification->content)->toContain($this->service->unit);
+    expect($notification->content)->toContain('LND-200');
+});
+
 test('admin can create transaction with QRIS upfront and payment proof', function () {
     Storage::fake('public');
 
@@ -365,8 +399,8 @@ test('refined voucher system features: redemption, expiration, security and usag
     $redeemResponse->assertStatus(201);
     $voucherCode = $redeemResponse->json('data.voucher_code');
 
-    // Assert code stores user id and has 3 days expiry
-    expect($voucherCode)->toContain('-' . $this->customer_user->id . '-');
+    // Assert code is 6 characters and has 3 days expiry
+    expect(strlen($voucherCode))->toBe(6);
     
     $redemption = \App\Models\PointsRedemption::where('voucher_code', $voucherCode)->first();
     expect($redemption->expires_at)->not->toBeNull();

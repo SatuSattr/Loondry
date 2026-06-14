@@ -43,7 +43,7 @@
   --muted-foreground: hsl(215 16% 70%);
   --accent: hsl(202 69% 12%);
   --accent-foreground: hsl(202 69% 80%);
-  --destructive: hsl(0 62.8% 30.6%);
+  --destructive: hsl(0 84.2% 60.2%);
   --border: hsl(222 20% 16%);
   --input: hsl(222 20% 16%);
   --ring: hsl(202 69% 63%);
@@ -152,7 +152,6 @@
   }
   html {
     @apply font-sans;
-    scrollbar-gutter: stable;
     padding-right: 0 !important;
   }
 
@@ -182,5 +181,26 @@
   }
   #nprogress .peg {
     box-shadow: 0 0 10px var(--color-primary), 0 0 5px var(--color-primary) !important;
+  }
+
+  /* Sidebar Navigation Links */
+  .sidebar-nav-link {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Sunken effect on Hover */
+  .sidebar-nav-link:not(.active-nav):hover {
+    background-color: var(--color-accent) !important;
+    color: var(--color-accent-foreground) !important;
+    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06), inset 0 1px 2px 0 rgba(0, 0, 0, 0.04) !important;
+  }
+  .dark .sidebar-nav-link:not(.active-nav):hover {
+    box-shadow: inset 0 2px 6px 0 rgba(0, 0, 0, 0.45), inset 0 1px 3px 0 rgba(0, 0, 0, 0.3) !important;
+  }
+
+  /* Active Nav Link Flat Style */
+  .sidebar-nav-link.active-nav {
+    background-color: var(--color-primary) !important;
+    color: var(--color-primary-foreground) !important;
   }
 }

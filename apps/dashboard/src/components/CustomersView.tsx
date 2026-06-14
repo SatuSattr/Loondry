@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
-import { Search, Loader2, Edit, Trash2, PlusCircle, RefreshCw, Phone, MapPin, Award, Ticket, SlidersHorizontal, X } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { Search, Loader2, Edit, Trash2, PlusCircle, RefreshCw, Phone, MapPin, Award, SlidersHorizontal, X, MessageSquare, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ErrorDialog from '@/components/shadcn-studio/blocks/dashboard-dialog-22/dialog-error';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,10 +15,17 @@ import {
 interface CustomersViewProps {
   onOpenCreateCustomer: () => void;
   onOpenEditCustomer: (customer: any) => void;
-  onOpenRedeemVoucher: (customer: any) => void;
 }
 
-export function CustomersView({ onOpenCreateCustomer, onOpenEditCustomer, onOpenRedeemVoucher }: CustomersViewProps) {
+export function CustomersView({ onOpenCreateCustomer, onOpenEditCustomer }: CustomersViewProps) {
+  const handleWhatsAppRedirect = (phone: string) => {
+    let cleaned = phone.replace(/\D/g, '');
+    if (cleaned.startsWith('0')) {
+      cleaned = '62' + cleaned.substring(1);
+    }
+    window.open(`https://wa.me/${cleaned}`, '_blank');
+  };
+
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -60,6 +69,29 @@ export function CustomersView({ onOpenCreateCustomer, onOpenEditCustomer, onOpen
     return true;
   });
 
+  // Sort State
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+
+  // Sort logic
+  const sortedCustomers = [...filteredCustomers].sort((a, b) => {
+    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+  });
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
+  const totalItems = sortedCustomers.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedCustomers = sortedCustomers.slice(startIndex, startIndex + itemsPerPage);
+
+  // Reset to page 1 on filter/search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, genderFilter, pointsFilter, sortOrder]);
+
   // Handle debounce search
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
@@ -89,8 +121,9 @@ export function CustomersView({ onOpenCreateCustomer, onOpenEditCustomer, onOpen
     try {
       await api.deleteCustomer(customer.id);
       setCustomers((prev) => prev.filter((c) => c.id !== customer.id));
+      toast.success('Customer deleted successfully');
     } catch (err: any) {
-      alert(err.message || 'Failed to delete customer');
+      toast.error(err.message || 'Failed to delete customer');
     }
   };
 
@@ -110,8 +143,10 @@ export function CustomersView({ onOpenCreateCustomer, onOpenEditCustomer, onOpen
       await Promise.all(selectedIds.map((id) => api.deleteCustomer(id)));
       setCustomers((prev) => prev.filter((c) => !selectedIds.includes(c.id)));
       setSelectedIds([]);
+      toast.success('Selected customers deleted successfully');
     } catch (err: any) {
       setError(err.message || 'Failed to delete selected customers');
+      toast.error(err.message || 'Failed to delete selected customers');
     } finally {
       setBulkDeleting(false);
     }
@@ -201,14 +236,41 @@ export function CustomersView({ onOpenCreateCustomer, onOpenEditCustomer, onOpen
             </DropdownMenuContent>
           </DropdownMenu>
 
+          {/* Sort Order Filter */}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button variant="outline" size="lg" className="gap-1.5 cursor-pointer text-xs font-semibold text-foreground">
+                  <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>Sort: {sortOrder === 'newest' ? 'Newest' : 'Oldest'}</span>
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end" className="w-40 bg-card border border-border text-foreground">
+              <DropdownMenuItem
+                onClick={() => setSortOrder('newest')}
+                className="cursor-pointer hover:bg-accent hover:text-accent-foreground text-xs"
+              >
+                Newest First
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setSortOrder('oldest')}
+                className="cursor-pointer hover:bg-accent hover:text-accent-foreground text-xs"
+              >
+                Oldest First
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           {/* Clear Filters */}
-          {(genderFilter !== 'all' || pointsFilter !== 'all') && (
+          {(genderFilter !== 'all' || pointsFilter !== 'all' || sortOrder !== 'newest') && (
             <Button
               variant="ghost"
               size="lg"
               onClick={() => {
                 setGenderFilter('all');
                 setPointsFilter('all');
+                setSortOrder('newest');
               }}
               className="px-2.5 text-muted-foreground hover:text-foreground hover:bg-accent/50 cursor-pointer text-xs"
               title="Clear all filters"
@@ -268,8 +330,8 @@ export function CustomersView({ onOpenCreateCustomer, onOpenEditCustomer, onOpen
       ) : displayMode === 'cards' ? (
         /* Card Layout */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredCustomers.length > 0 ? (
-            filteredCustomers.map((c) => (
+          {paginatedCustomers.length > 0 ? (
+            paginatedCustomers.map((c) => (
               <div
                 key={c.id}
                 className="bg-card border border-border rounded-xl p-5 shadow-xs flex flex-col justify-between hover:border-primary/40 hover:shadow-md transition-all space-y-4"
@@ -316,11 +378,11 @@ export function CustomersView({ onOpenCreateCustomer, onOpenEditCustomer, onOpen
                     <span>Edit</span>
                   </button>
                   <button
-                    onClick={() => onOpenRedeemVoucher(c)}
+                    onClick={() => handleWhatsAppRedirect(c.phone)}
                     className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 py-1.5 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 transition-all cursor-pointer flex-1.5"
                   >
-                    <Ticket className="h-3.5 w-3.5" />
-                    <span>Redeem Vouch</span>
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    <span>WhatsApp</span>
                   </button>
                   <ErrorDialog
                     title="Delete Customer"
@@ -355,18 +417,18 @@ export function CustomersView({ onOpenCreateCustomer, onOpenEditCustomer, onOpen
               <thead>
                 <tr className="border-b border-border bg-muted/40 text-muted-foreground text-xs uppercase tracking-wider">
                   <th className="p-4 w-12 text-center">
-                    <input
-                      type="checkbox"
-                      checked={filteredCustomers.length > 0 && selectedIds.length === filteredCustomers.length}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedIds(filteredCustomers.map((c) => c.id));
-                        } else {
-                          setSelectedIds([]);
-                        }
-                      }}
-                      className="rounded border-border text-primary cursor-pointer h-4 w-4 focus:ring-ring bg-background"
-                    />
+                    <div className="flex justify-center">
+                      <Checkbox
+                        checked={filteredCustomers.length > 0 && selectedIds.length === filteredCustomers.length}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedIds(filteredCustomers.map((c) => c.id));
+                          } else {
+                            setSelectedIds([]);
+                          }
+                        }}
+                      />
+                    </div>
                   </th>
                   <th className="p-4">Customer Name</th>
                   <th className="p-4">Contact Info</th>
@@ -377,8 +439,8 @@ export function CustomersView({ onOpenCreateCustomer, onOpenEditCustomer, onOpen
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredCustomers.length > 0 ? (
-                  filteredCustomers.map((c) => (
+                {paginatedCustomers.length > 0 ? (
+                  paginatedCustomers.map((c) => (
                     <tr
                       key={c.id}
                       className={`hover:bg-accent/25 text-foreground transition-all ${
@@ -386,18 +448,18 @@ export function CustomersView({ onOpenCreateCustomer, onOpenEditCustomer, onOpen
                       }`}
                     >
                       <td className="p-4 w-12 text-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(c.id)}
-                          onChange={() => {
-                            setSelectedIds((prev) =>
-                              prev.includes(c.id)
-                                ? prev.filter((id) => id !== c.id)
-                                : [...prev, c.id]
-                            );
-                          }}
-                          className="rounded border-border text-primary cursor-pointer h-4 w-4 focus:ring-ring bg-background"
-                        />
+                        <div className="flex justify-center">
+                          <Checkbox
+                            checked={selectedIds.includes(c.id)}
+                            onCheckedChange={(checked) => {
+                              setSelectedIds((prev) =>
+                                checked
+                                  ? [...prev, c.id]
+                                  : prev.filter((id) => id !== c.id)
+                              );
+                            }}
+                          />
+                        </div>
                       </td>
                       <td className="p-4 font-semibold text-sm">
                         {c.user?.name}
@@ -428,11 +490,11 @@ export function CustomersView({ onOpenCreateCustomer, onOpenEditCustomer, onOpen
                             <Edit className="h-3.5 w-3.5" />
                           </button>
                           <button
-                            onClick={() => onOpenRedeemVoucher(c)}
+                            onClick={() => handleWhatsAppRedirect(c.phone)}
                             className="p-1.5 rounded-md border border-border bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 transition-all cursor-pointer"
-                            title="Redeem points for voucher"
+                            title="Open WhatsApp chat"
                           >
-                            <Ticket className="h-3.5 w-3.5" />
+                            <MessageSquare className="h-3.5 w-3.5" />
                           </button>
                            <ErrorDialog
                             title="Delete Customer"
@@ -463,6 +525,80 @@ export function CustomersView({ onOpenCreateCustomer, onOpenEditCustomer, onOpen
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between border-t border-border pt-4 mt-4 bg-card px-4 py-3 rounded-xl shadow-xs">
+          <div className="flex flex-1 justify-between sm:hidden">
+            <Button
+              variant="outline"
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="cursor-pointer"
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="cursor-pointer"
+            >
+              Next
+            </Button>
+          </div>
+          <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground">
+                Showing <span className="font-semibold text-foreground">{startIndex + 1}</span> to{' '}
+                <span className="font-semibold text-foreground">
+                  {Math.min(startIndex + itemsPerPage, totalItems)}
+                </span>{' '}
+                of <span className="font-semibold text-foreground">{totalItems}</span> results
+              </p>
+            </div>
+            <div>
+              <nav className="isolate inline-flex -space-x-px rounded-md shadow-xs" aria-label="Pagination">
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="relative inline-flex items-center rounded-l-md px-2.5 py-2 text-muted-foreground ring-1 ring-inset ring-border hover:bg-accent focus:z-20 focus:outline-offset-0 disabled:opacity-40 cursor-pointer text-xs"
+                >
+                  <ChevronLeft className="h-4.5 w-4.5" />
+                </button>
+                {(() => {
+                  const maxButtons = 5;
+                  let start = Math.max(1, currentPage - 2);
+                  let end = Math.min(totalPages, start + maxButtons - 1);
+                  if (end - start + 1 < maxButtons) {
+                    start = Math.max(1, end - maxButtons + 1);
+                  }
+                  return Array.from({ length: end - start + 1 }, (_, idx) => start + idx);
+                })().map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`relative inline-flex items-center px-3.5 py-2 text-xs font-semibold ring-1 ring-inset ring-border focus:z-20 cursor-pointer ${
+                      currentPage === page
+                        ? 'z-10 bg-primary text-primary-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
+                        : 'text-foreground hover:bg-accent'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="relative inline-flex items-center rounded-r-md px-2.5 py-2 text-muted-foreground ring-1 ring-inset ring-border hover:bg-accent focus:z-20 focus:outline-offset-0 disabled:opacity-40 cursor-pointer text-xs"
+                >
+                  <ChevronRight className="h-4.5 w-4.5" />
+                </button>
+              </nav>
+            </div>
           </div>
         </div>
       )}

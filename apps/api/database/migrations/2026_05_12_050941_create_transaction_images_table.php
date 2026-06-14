@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('transaction_id')->constrained()->onDelete('cascade');
             $table->string('image_path');
+            $table->string('type', 20)->default('before'); // 'before' or 'after'
             $table->timestamps();
         });
     }

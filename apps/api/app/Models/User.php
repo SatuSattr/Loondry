@@ -13,12 +13,25 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password', 'role', 'birth_date', 'religion', 'gender', 'points'])]
+#[Fillable(['name', 'email', 'password', 'role', 'birth_date', 'religion', 'gender', 'points', 'avatar', 'device_token'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
+
+    protected $appends = ['avatar_url'];
+
+    public function getAvatarUrlAttribute(): ?string
+    {
+        if (!$this->avatar) {
+            return null;
+        }
+        if (filter_var($this->avatar, FILTER_VALIDATE_URL)) {
+            return $this->avatar;
+        }
+        return url(\Illuminate\Support\Facades\Storage::url($this->avatar));
+    }
 
     /**
      * Send the password reset notification.

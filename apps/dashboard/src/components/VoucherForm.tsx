@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../lib/api';
+import toast from 'react-hot-toast';
 import { Loader2, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -28,6 +29,7 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [status, setStatus] = useState('active');
+  const [minRank, setMinRank] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -46,6 +48,7 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
       setStartDate(voucher.start_date ? voucher.start_date.substring(0, 10) : '');
       setEndDate(voucher.end_date ? voucher.end_date.substring(0, 10) : '');
       setStatus(voucher.status || 'active');
+      setMinRank(voucher.min_rank || '');
       setError('');
     } else {
       setCode('');
@@ -60,6 +63,7 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
       setStartDate('');
       setEndDate('');
       setStatus('active');
+      setMinRank('');
       setError('');
     }
   }, [voucher]);
@@ -87,17 +91,21 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
       start_date: startDate || null,
       end_date: endDate || null,
       status: status,
+      min_rank: minRank || null,
     };
 
     try {
       if (voucher) {
         await api.updateVoucherTemplate(voucher.id, payload);
+        toast.success('Voucher template updated successfully');
       } else {
         await api.createVoucherTemplate(payload);
+        toast.success('Voucher template created successfully');
       }
       onSubmitSuccess();
     } catch (err: any) {
       setError(err.message || 'Failed to save voucher template');
+      toast.error(err.message || 'Failed to save voucher template');
     } finally {
       setLoading(false);
     }
@@ -117,10 +125,11 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
         <input
           type="text"
           required
+          disabled={loading}
           value={code}
           onChange={(e) => setCode(e.target.value)}
           placeholder="e.g. FLASHDEAL90"
-          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground uppercase"
+          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground uppercase disabled:opacity-50"
         />
       </div>
 
@@ -130,10 +139,11 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
         <input
           type="text"
           required
+          disabled={loading}
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Diskon 90% s.d Rp 30k"
-          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground"
+          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground disabled:opacity-50"
         />
       </div>
 
@@ -143,9 +153,10 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
+          disabled={loading}
           placeholder="Voucher details..."
           rows={2}
-          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground resize-none"
+          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground resize-none disabled:opacity-50"
         />
       </div>
 
@@ -160,7 +171,8 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
                   <Button
                     variant="outline"
                     size="lg"
-                    className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
+                    disabled={loading}
+                    className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer disabled:opacity-50"
                   >
                     <span>{discountType === 'percentage' ? 'Percentage (%)' : 'Flat Amount (Rp)'}</span>
                     <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
@@ -169,7 +181,7 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
               />
               <DropdownMenuContent className="w-[150px] bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
                 <DropdownMenuItem
-                  onClick={() => setDiscountType('percentage')}
+                  onClick={() => !loading && setDiscountType('percentage')}
                   className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
                     discountType === 'percentage' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
                   }`}
@@ -177,7 +189,7 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
                   Percentage (%)
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={() => setDiscountType('flat')}
+                  onClick={() => !loading && setDiscountType('flat')}
                   className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
                     discountType === 'flat' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
                   }`}
@@ -197,10 +209,11 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
             type="number"
             required
             min="1"
+            disabled={loading}
             value={discountValue}
             onChange={(e) => setDiscountValue(e.target.value)}
             placeholder={discountType === 'percentage' ? 'e.g. 90' : 'e.g. 15000'}
-            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground"
+            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground disabled:opacity-50"
           />
         </div>
       </div>
@@ -211,7 +224,7 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
           <label className="text-sm font-medium text-foreground">Max Discount (Rp)</label>
           <input
             type="number"
-            disabled={discountType === 'flat'}
+            disabled={loading || discountType === 'flat'}
             value={discountType === 'flat' ? '' : maxDiscount}
             onChange={(e) => setMaxDiscount(e.target.value)}
             placeholder={discountType === 'flat' ? 'Unlimited' : 'e.g. 30000'}
@@ -223,10 +236,11 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
           <label className="text-sm font-medium text-foreground">Min Transaction (Rp)</label>
           <input
             type="number"
+            disabled={loading}
             value={minTransaction}
             onChange={(e) => setMinTransaction(e.target.value)}
             placeholder="e.g. 300000"
-            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground"
+            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground disabled:opacity-50"
           />
         </div>
       </div>
@@ -239,10 +253,11 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
             type="number"
             required
             min="0"
+            disabled={loading}
             value={pointsCost}
             onChange={(e) => setPointsCost(e.target.value)}
             placeholder="e.g. 100"
-            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground"
+            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground disabled:opacity-50"
           />
         </div>
 
@@ -255,7 +270,8 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
                   <Button
                     variant="outline"
                     size="lg"
-                    className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
+                    disabled={loading}
+                    className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer disabled:opacity-50"
                   >
                     <span className="capitalize">{status}</span>
                     <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
@@ -264,7 +280,7 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
               />
               <DropdownMenuContent className="w-[150px] bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
                 <DropdownMenuItem
-                  onClick={() => setStatus('active')}
+                  onClick={() => !loading && setStatus('active')}
                   className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
                     status === 'active' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
                   }`}
@@ -272,7 +288,7 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
                   Active
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={() => setStatus('inactive')}
+                  onClick={() => !loading && setStatus('inactive')}
                   className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
                     status === 'inactive' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
                   }`}
@@ -285,20 +301,63 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
         </div>
       </div>
 
-      {/* Max Redemptions per Customer */}
-      <div className="space-y-1">
-        <label className="text-sm font-medium text-foreground">Max Redemptions per Customer</label>
-        <input
-          type="number"
-          min="1"
-          value={maxUsesPerUser}
-          onChange={(e) => setMaxUsesPerUser(e.target.value)}
-          placeholder="Unlimited (e.g. 5)"
-          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground"
-        />
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Limit how many times a single customer can redeem this voucher. Leave empty for unlimited.
-        </p>
+      {/* Max Redemptions per Customer & Minimum Rank */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-foreground">Max Redemptions per Customer</label>
+          <input
+            type="number"
+            min="1"
+            disabled={loading}
+            value={maxUsesPerUser}
+            onChange={(e) => setMaxUsesPerUser(e.target.value)}
+            placeholder="Unlimited (e.g. 5)"
+            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground disabled:opacity-50"
+          />
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Limit how many times a user can redeem. Leave empty for unlimited.
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-foreground">Required Minimum Rank</label>
+          <div>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    disabled={loading}
+                    className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer disabled:opacity-50 text-left capitalize"
+                  >
+                    <span>{minRank ? minRank : 'No Rank Limit'}</span>
+                    <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent className="w-[180px] bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
+                {[
+                  { value: '', label: 'No Rank Limit' },
+                  { value: 'bronze', label: 'Bronze' },
+                  { value: 'silver', label: 'Silver' },
+                  { value: 'gold', label: 'Gold' },
+                  { value: 'platinum', label: 'Platinum' }
+                ].map((item) => (
+                  <DropdownMenuItem
+                    key={item.value}
+                    onClick={() => !loading && setMinRank(item.value)}
+                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
+                      minRank === item.value ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
+                    }`}
+                  >
+                    {item.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
       </div>
 
       {/* Validity Dates */}
@@ -307,9 +366,10 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
           <label className="text-sm font-medium text-foreground">Start Date</label>
           <input
             type="date"
+            disabled={loading}
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground"
+            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground disabled:opacity-50"
           />
         </div>
 
@@ -317,9 +377,10 @@ export function VoucherForm({ voucher, onSubmitSuccess, onCancel }: VoucherFormP
           <label className="text-sm font-medium text-foreground">End Date</label>
           <input
             type="date"
+            disabled={loading}
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground"
+            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground disabled:opacity-50"
           />
         </div>
       </div>

@@ -1,13 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../lib/api';
-import { Search, Loader2, User, PlusCircle, ChevronDown, Ticket, Check } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import toast from 'react-hot-toast';
+import { Search, Loader2, User, PlusCircle, Ticket, Check } from 'lucide-react';
 
 interface TransactionFormProps {
   onSubmitSuccess: () => void;
@@ -28,6 +22,9 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
   const [services, setServices] = useState<any[]>([]);
   const [selectedService, setSelectedService] = useState<any | null>(null);
   const [loadingServices, setLoadingServices] = useState(false);
+  const [serviceSearch, setServiceSearch] = useState('');
+  const [showServiceDropdown, setShowServiceDropdown] = useState(false);
+  const serviceDropdownRef = useRef<HTMLDivElement>(null);
 
   // Form inputs
   const [weight, setWeight] = useState('');
@@ -65,6 +62,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
         setServices(activeServices);
         if (activeServices.length > 0) {
           setSelectedService(activeServices[0]);
+          setServiceSearch(activeServices[0].service_name);
         }
       } catch (err) {
         console.error('Failed to load services', err);
@@ -109,6 +107,9 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowDropdown(false);
+      }
+      if (serviceDropdownRef.current && !serviceDropdownRef.current.contains(event.target as Node)) {
+        setShowServiceDropdown(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -199,13 +200,19 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
 
     try {
       await api.createTransaction(formData);
+      toast.success('Order created successfully!');
       onSubmitSuccess();
     } catch (err: any) {
       setError(err.message || 'Failed to create transaction');
+      toast.error(err.message || 'Failed to create transaction');
     } finally {
       setLoading(false);
     }
   };
+
+  const filteredServices = services.filter((s) =>
+    s.service_name.toLowerCase().includes(serviceSearch.toLowerCase())
+  );
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
@@ -234,11 +241,12 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
             </div>
             <button
               type="button"
+              disabled={loading}
               onClick={() => {
                 setSelectedCustomer(null);
                 setCustomerSearch('');
               }}
-              className="text-xs font-medium text-destructive hover:underline cursor-pointer"
+              className="text-xs font-medium text-destructive hover:underline cursor-pointer disabled:opacity-50"
             >
               Change
             </button>
@@ -248,6 +256,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
+              disabled={loading}
               value={customerSearch}
               onChange={(e) => {
                 setCustomerSearch(e.target.value);
@@ -255,7 +264,8 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
               }}
               onFocus={() => setShowDropdown(true)}
               placeholder="Search by name, email or phone..."
-              className="w-full bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring"
+              autoComplete="off"
+              className="w-full bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring disabled:opacity-50"
             />
             
             {showDropdown && (
@@ -312,7 +322,7 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
       </div>
 
       {/* 2. Service Selection */}
-      <div className="space-y-1">
+      <div className="space-y-1 relative" ref={serviceDropdownRef}>
         <label className="text-sm font-medium text-foreground">Service *</label>
         {loadingServices ? (
           <div className="flex items-center text-sm text-muted-foreground">
@@ -320,37 +330,47 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
           </div>
         ) : (
           <div>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
-                  >
-                    <span>
-                      {selectedService
-                        ? `${selectedService.service_name} (Rp ${selectedService.price.toLocaleString()}/${selectedService.unit})`
-                        : 'Select a service...'}
-                    </span>
-                    <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
-                  </Button>
-                }
-              />
-              <DropdownMenuContent className="w-80 max-h-60 overflow-y-auto bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
-                {services.map((s) => (
-                  <DropdownMenuItem
-                    key={s.id}
-                    onClick={() => setSelectedService(s)}
-                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
-                      selectedService?.id === s.id ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
-                    }`}
-                  >
-                    {s.service_name} (Rp {s.price.toLocaleString()}/{s.unit})
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <input
+              type="text"
+              disabled={loading}
+              value={serviceSearch}
+              onChange={(e) => {
+                setServiceSearch(e.target.value);
+                setShowServiceDropdown(true);
+              }}
+              onFocus={() => setShowServiceDropdown(true)}
+              placeholder="Search service by name..."
+              autoComplete="off"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground disabled:opacity-50"
+            />
+            {showServiceDropdown && (
+              <div className="absolute top-full left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-card border border-border rounded-lg shadow-lg z-50 divide-y divide-border">
+                {filteredServices.length > 0 ? (
+                  filteredServices.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => {
+                        setSelectedService(s);
+                        setServiceSearch(s.service_name);
+                        setShowServiceDropdown(false);
+                      }}
+                      className="w-full text-left p-3 hover:bg-accent hover:text-accent-foreground cursor-pointer flex justify-between items-center text-sm transition-colors focus:bg-accent focus:text-accent-foreground outline-hidden border-none disabled:opacity-50"
+                    >
+                      <span className="font-medium text-foreground">{s.service_name}</span>
+                      <span className="text-xs text-muted-foreground font-semibold">
+                        Rp {s.price.toLocaleString()}/{s.unit}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="p-3 text-center text-xs text-muted-foreground">
+                    No services found.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -365,10 +385,12 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
           step="0.01"
           required
           min="0.1"
+          disabled={loading}
           value={weight}
           onChange={(e) => setWeight(e.target.value)}
           placeholder={`Enter quantity in ${unit}...`}
-          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring"
+          autoComplete="off"
+          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring disabled:opacity-50"
         />
       </div>
 
@@ -378,8 +400,9 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
+            disabled={loading}
             onClick={() => setPaymentTiming('upfront')}
-            className={`py-2 px-3 border rounded-lg text-xs font-medium cursor-pointer transition-all ${
+            className={`py-2 px-3 border rounded-lg text-xs font-medium cursor-pointer transition-all disabled:opacity-50 ${
               paymentTiming === 'upfront'
                 ? 'border-primary bg-primary/5 text-primary font-semibold'
                 : 'border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground'
@@ -389,12 +412,13 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
           </button>
           <button
             type="button"
+            disabled={loading}
             onClick={() => {
               setPaymentTiming('pickup');
               setPaymentProofFile(null);
               setPaymentProofPreview(null);
             }}
-            className={`py-2 px-3 border rounded-lg text-xs font-medium cursor-pointer transition-all ${
+            className={`py-2 px-3 border rounded-lg text-xs font-medium cursor-pointer transition-all disabled:opacity-50 ${
               paymentTiming === 'pickup'
                 ? 'border-primary bg-primary/5 text-primary font-semibold'
                 : 'border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground'
@@ -517,15 +541,17 @@ export function TransactionForm({ onSubmitSuccess, onCancel, onOpenCreateCustome
           <div className="flex gap-2 pt-1.5">
             <input
               type="text"
+              disabled={loading}
               placeholder="Enter customer's voucher code..."
               value={voucherCode}
               onChange={(e) => setVoucherCode(e.target.value)}
-              className="flex-1 bg-background border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground uppercase"
+              autoComplete="off"
+              className="flex-1 bg-background border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring text-foreground uppercase disabled:opacity-50"
             />
             <button
               type="button"
               onClick={handleApplyVoucher}
-              disabled={checkingVoucher || !voucherCode.trim()}
+              disabled={checkingVoucher || loading || !voucherCode.trim()}
               className="bg-primary text-primary-foreground hover:bg-primary/90 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center min-w-10"
               title="Apply Voucher"
             >

@@ -19,7 +19,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'max_uses_per_user',
     'start_date',
     'end_date',
-    'status'
+    'status',
+    'min_rank'
 ])]
 class Voucher extends Model
 {

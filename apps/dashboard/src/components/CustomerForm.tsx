@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../lib/api';
+import toast from 'react-hot-toast';
 import { Loader2, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,6 +30,11 @@ export function CustomerForm({ customer, onSubmitSuccess, onCancel }: CustomerFo
   const [error, setError] = useState('');
   const [successData, setSuccessData] = useState<any>(null);
 
+  // Customer avatar upload states
+  const [customerAvatarUrl, setCustomerAvatarUrl] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const customerFileRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (customer) {
       setName(customer.user?.name || '');
@@ -41,6 +47,7 @@ export function CustomerForm({ customer, onSubmitSuccess, onCancel }: CustomerFo
       setPassword('');
       setError('');
       setSuccessData(null);
+      setCustomerAvatarUrl(customer.user?.avatar_url || null);
     } else {
       setName('');
       setEmail('');
@@ -52,8 +59,35 @@ export function CustomerForm({ customer, onSubmitSuccess, onCancel }: CustomerFo
       setPassword('');
       setError('');
       setSuccessData(null);
+      setCustomerAvatarUrl(null);
     }
   }, [customer]);
+
+  const handleCustomerAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image size must be less than 2MB');
+      return;
+    }
+
+    setAvatarUploading(true);
+    try {
+      const res = await api.updateCustomerAvatar(customer.id, file);
+      setCustomerAvatarUrl(res.avatar_url || res.data?.user?.avatar_url);
+      toast.success(res.message || 'Avatar uploaded successfully');
+      window.dispatchEvent(new Event('refresh-data'));
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to upload avatar');
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,11 +165,54 @@ export function CustomerForm({ customer, onSubmitSuccess, onCancel }: CustomerFo
     );
   }
 
+  const isSaving = loading || avatarUploading;
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
         <div className="bg-destructive/10 text-destructive border border-destructive/20 rounded-lg p-3 text-sm font-medium">
           {error}
+        </div>
+      )}
+
+      {customer && (
+        <div className="flex flex-col items-center space-y-3 pb-4 border-b border-border">
+          <div className="relative">
+            <div className="h-24 w-24 rounded-full overflow-hidden border border-border bg-muted flex items-center justify-center relative shadow-xs">
+              {customerAvatarUrl ? (
+                <img src={customerAvatarUrl} alt={name} className="h-full w-full object-cover" />
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-12 h-12 text-muted-foreground">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                </svg>
+              )}
+              {avatarUploading && (
+                <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-full">
+                  <Loader2 className="h-5 w-5 animate-spin text-white" />
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={() => customerFileRef.current?.click()}
+              className="absolute bottom-0 right-0 bg-primary text-primary-foreground p-1.5 rounded-full hover:bg-primary/95 shadow-md cursor-pointer disabled:opacity-50"
+              title="Upload customer photo"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 3 3m-3-3v12" />
+              </svg>
+            </button>
+            <input
+              type="file"
+              ref={customerFileRef}
+              onChange={handleCustomerAvatarChange}
+              accept="image/*"
+              className="hidden"
+              disabled={isSaving}
+            />
+          </div>
+          <span className="text-xs text-muted-foreground">Customer Profile Picture</span>
         </div>
       )}
 
@@ -146,8 +223,9 @@ export function CustomerForm({ customer, onSubmitSuccess, onCancel }: CustomerFo
           required
           value={name}
           onChange={(e) => setName(e.target.value)}
+          disabled={isSaving}
           placeholder="e.g. John Doe"
-          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring"
+          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring disabled:opacity-50"
         />
       </div>
 
@@ -158,8 +236,9 @@ export function CustomerForm({ customer, onSubmitSuccess, onCancel }: CustomerFo
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          disabled={isSaving}
           placeholder="e.g. customer@example.com"
-          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring"
+          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring disabled:opacity-50"
         />
       </div>
 
@@ -170,8 +249,9 @@ export function CustomerForm({ customer, onSubmitSuccess, onCancel }: CustomerFo
           required
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
+          disabled={isSaving}
           placeholder="e.g. 0812345678"
-          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring"
+          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring disabled:opacity-50"
         />
       </div>
 
@@ -181,9 +261,10 @@ export function CustomerForm({ customer, onSubmitSuccess, onCancel }: CustomerFo
           required
           value={address}
           onChange={(e) => setAddress(e.target.value)}
+          disabled={isSaving}
           placeholder="Street address..."
           rows={3}
-          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring resize-none"
+          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring resize-none disabled:opacity-50"
         />
       </div>
 
@@ -197,7 +278,8 @@ export function CustomerForm({ customer, onSubmitSuccess, onCancel }: CustomerFo
                   <Button
                     variant="outline"
                     size="lg"
-                    className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer"
+                    disabled={isSaving}
+                    className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer disabled:opacity-50"
                   >
                     <span>{gender === 'L' ? 'Male (L)' : 'Female (P)'}</span>
                     <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
@@ -206,7 +288,7 @@ export function CustomerForm({ customer, onSubmitSuccess, onCancel }: CustomerFo
               />
               <DropdownMenuContent className="w-[150px] bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
                 <DropdownMenuItem
-                  onClick={() => setGender('L')}
+                  onClick={() => !isSaving && setGender('L')}
                   className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
                     gender === 'L' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
                   }`}
@@ -214,7 +296,7 @@ export function CustomerForm({ customer, onSubmitSuccess, onCancel }: CustomerFo
                   Male (L)
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={() => setGender('P')}
+                  onClick={() => !isSaving && setGender('P')}
                   className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
                     gender === 'P' ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
                   }`}
@@ -232,20 +314,50 @@ export function CustomerForm({ customer, onSubmitSuccess, onCancel }: CustomerFo
             type="date"
             value={birthDate}
             onChange={(e) => setBirthDate(e.target.value)}
-            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring"
+            disabled={isSaving}
+            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring disabled:opacity-50"
           />
         </div>
       </div>
 
       <div className="space-y-1">
         <label className="text-sm font-medium text-foreground">Religion</label>
-        <input
-          type="text"
-          value={religion}
-          onChange={(e) => setReligion(e.target.value)}
-          placeholder="e.g. Islam, Kristen, dll."
-          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring"
-        />
+        <div>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="lg"
+                  disabled={isSaving}
+                  className="w-full justify-between text-sm font-normal border-border bg-background hover:bg-accent text-foreground cursor-pointer disabled:opacity-50"
+                >
+                  <span>{religion || 'Select Religion'}</span>
+                  <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                </Button>
+              }
+            />
+            <DropdownMenuContent className="w-[200px] bg-card border border-border rounded-lg shadow-lg z-50 py-1" align="start">
+              <DropdownMenuItem
+                onClick={() => !isSaving && setReligion('')}
+                className="w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer text-muted-foreground"
+              >
+                Select Religion (None)
+              </DropdownMenuItem>
+              {['Islam', 'Kristen Protestan', 'Kristen Katolik', 'Hindu', 'Buddha', 'Khonghucu'].map((r) => (
+                <DropdownMenuItem
+                  key={r}
+                  onClick={() => !isSaving && setReligion(r)}
+                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
+                    religion === r ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground'
+                  }`}
+                >
+                  {r}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <div className="space-y-1">
@@ -256,8 +368,9 @@ export function CustomerForm({ customer, onSubmitSuccess, onCancel }: CustomerFo
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          disabled={isSaving}
           placeholder={customer ? '••••••••' : 'Leave blank to generate automatically'}
-          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring"
+          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring disabled:opacity-50"
         />
       </div>
 
@@ -265,14 +378,14 @@ export function CustomerForm({ customer, onSubmitSuccess, onCancel }: CustomerFo
         <button
           type="button"
           onClick={onCancel}
-          disabled={loading}
+          disabled={isSaving}
           className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80 py-2 px-4 rounded-lg font-medium transition-colors cursor-pointer text-sm text-center disabled:opacity-50"
         >
           Cancel
         </button>
         <button
           type="submit"
-          disabled={loading}
+          disabled={isSaving}
           className="flex-2 bg-primary text-primary-foreground hover:bg-primary/95 py-2 px-4 rounded-lg font-medium transition-colors cursor-pointer text-sm flex items-center justify-center disabled:opacity-50"
         >
           {loading ? (
