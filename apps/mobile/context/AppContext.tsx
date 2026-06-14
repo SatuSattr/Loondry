@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { useColorScheme, Clipboard, Animated, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { api, setAuthToken } from '../src/api';
 import { LIGHT_COLORS, DARK_COLORS, createStyles, MOCK_PROOF_BASE64 } from '../styles';
 import { router } from 'expo-router';
@@ -231,7 +232,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return;
       }
 
-      const tokenData = await Notifications.getExpoPushTokenAsync();
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+      if (!projectId) {
+        console.log('[AppContext] registerPushNotifications: projectId not found in configuration. EAS/Expo Project ID is required to get Push Token.');
+      }
+
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId,
+      });
       const token = tokenData.data;
       if (token) {
         console.log('[AppContext] Expo Push Token:', token);
