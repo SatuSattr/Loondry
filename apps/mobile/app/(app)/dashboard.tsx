@@ -122,7 +122,7 @@ export default function DashboardScreen() {
         activeOpacity={0.9}
       >
         <LinearGradient
-          colors={[colors.primary, colors.primaryGradientEnd]}
+          colors={[colors.primary, (colors as any).primaryGradientEnd || '#2575a5']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{
