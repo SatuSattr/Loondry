@@ -76,3 +76,4 @@ apps/mobile/android
 # Global
 .DS_Store
 brief.md
+session_checkpoint.md
