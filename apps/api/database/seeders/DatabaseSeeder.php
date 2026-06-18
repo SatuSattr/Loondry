@@ -23,7 +23,11 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // 1. Clear existing data with foreign keys disabled
-        DB::statement('PRAGMA foreign_keys = OFF;');
+        if (DB::getDriverName() === 'sqlite') {
+            DB::statement('PRAGMA foreign_keys = OFF;');
+        } else {
+            DB::statement('SET FOREIGN_KEY_CHECKS = 0;');
+        }
         DB::table('transaction_logs')->truncate();
         DB::table('transaction_images')->truncate();
         DB::table('transactions')->truncate();
@@ -32,7 +36,11 @@ class DatabaseSeeder extends Seeder
         DB::table('vouchers')->truncate();
         DB::table('users')->truncate();
         DB::table('services')->truncate();
-        DB::statement('PRAGMA foreign_keys = ON;');
+        if (DB::getDriverName() === 'sqlite') {
+            DB::statement('PRAGMA foreign_keys = ON;');
+        } else {
+            DB::statement('SET FOREIGN_KEY_CHECKS = 1;');
+        }
 
         // 2. Seed Admin User
         $admin = User::create([

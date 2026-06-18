@@ -1,14 +1,13 @@
-FROM php:8.3-fpm-alpine
+FROM php:8.4-fpm-alpine
 
 RUN apk add --no-cache \
     bash \
     curl \
     git \
     nginx \
-    nodejs \
-    npm \
     zip \
     unzip \
+    libzip-dev \
     freetype-dev \
     libjpeg-turbo-dev \
     libpng-dev \
@@ -43,13 +42,12 @@ RUN cp .env.docker .env
 
 RUN composer install --no-dev --optimize-autoloader
 
-RUN npm install --no-dev && npm run build
-
 RUN php artisan key:generate && php artisan storage:link
 
 COPY docker/nginx.conf /etc/nginx/http.d/default.conf
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 80

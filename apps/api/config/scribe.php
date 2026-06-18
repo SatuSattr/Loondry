@@ -1,5 +1,9 @@
 <?php
 
+if (!class_exists(\Knuckles\Scribe\ScribeServiceProvider::class)) {
+    return [];
+}
+
 use Knuckles\Scribe\Config\AuthIn;
 use Knuckles\Scribe\Config\Defaults;
 use Knuckles\Scribe\Extracting\Strategies;
