@@ -89,25 +89,23 @@ Each endpoint group is documented in a separate file under the `documentation/` 
 ## Docker Deployment
 
 ### 1. Local Development & Testing (Docker Compose)
-You can run the API, database, and phpMyAdmin locally using Docker Compose:
+You can run the API application inside a Docker container locally. It is configured to run as a standalone service and read database credentials from your local `.env` file (so you can connect it to your own external MySQL database, Laragon, or other database instances):
 
 ```bash
 # Navigate to the API directory
 cd apps/api
 
-# Build and start the containers in the background
+# Build and start the API container in the background
 docker compose up -d --build
 ```
 
 #### Services Started:
 * **API Application:** `http://localhost:8000` (Nginx + PHP 8.4 FPM)
-* **MySQL Database:** Local port `33060` (Mapped to internal container port `3306`)
-* **phpMyAdmin:** `http://localhost:8080` (Manage your database easily)
 
-> [!NOTE]
-> When the containers boot, the entrypoint script automatically runs database migrations and seeds the database with initial admin credentials and transaction mock data.
+> [!IMPORTANT]
+> Make sure to configure your database connection parameters (e.g. `DB_HOST`, `DB_PORT`, `DB_DATABASE`, etc.) in your `apps/api/.env` file before running the container so it can connect to your database.
 
-To stop the containers:
+To stop the container:
 ```bash
 docker compose down
 ```
