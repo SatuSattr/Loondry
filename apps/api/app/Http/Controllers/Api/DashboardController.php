@@ -74,16 +74,16 @@ class DashboardController extends Controller
 
         return response()->json([
             'summary' => [
-                'total_revenue' => $totalRevenue,
-                'active_orders' => $activeOrders,
-                'total_customers' => $totalCustomers,
-                'total_laundry_masuk' => $totalLaundryMasuk,
+                'total_revenue' => (float) $totalRevenue,
+                'active_orders' => (int) $activeOrders,
+                'total_customers' => (int) $totalCustomers,
+                'total_laundry_masuk' => (int) $totalLaundryMasuk,
             ],
             'points_summary' => [
-                'total_points_earned' => $totalPointsEarned,
-                'total_points_redeemed' => $totalPointsRedeemed,
-                'total_vouchers_issued' => $totalVouchersIssued,
-                'total_vouchers_used' => $totalVouchersUsed,
+                'total_points_earned' => (float) $totalPointsEarned,
+                'total_points_redeemed' => (float) $totalPointsRedeemed,
+                'total_vouchers_issued' => (int) $totalVouchersIssued,
+                'total_vouchers_used' => (int) $totalVouchersUsed,
             ],
             'recent_transactions' => $recentTransactions,
             'daily_stats' => $dailyStats,
