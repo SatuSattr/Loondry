@@ -42,8 +42,25 @@ class CustomerController extends Controller
      */
     public function store(CustomerRequest $request)
     {
-        // Use password from request if provided, otherwise generate random 8-character
-        $passwordToUse = $request->password ?: Str::random(8);
+        // Use password from request if provided, otherwise generate easy-to-remember 6-character password (3 letters + 3 numbers)
+        if ($request->password) {
+            $passwordToUse = $request->password;
+        } else {
+            $lettersPool = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'M', 'N', 'P', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+            $numbersPool = ['2', '3', '4', '5', '6', '7', '8', '9'];
+
+            $randomLetters = '';
+            for ($i = 0; $i < 3; $i++) {
+                $randomLetters .= $lettersPool[array_rand($lettersPool)];
+            }
+
+            $randomNumbers = '';
+            for ($i = 0; $i < 3; $i++) {
+                $randomNumbers .= $numbersPool[array_rand($numbersPool)];
+            }
+
+            $passwordToUse = $randomLetters . $randomNumbers;
+        }
 
         $customer = DB::transaction(function () use ($request, $passwordToUse) {
             $user = User::create([
