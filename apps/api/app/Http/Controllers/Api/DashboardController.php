@@ -32,7 +32,18 @@ class DashboardController extends Controller
         $totalRevenue = $revenueQuery->sum('total_price');
         $activeOrders = Transaction::whereNotIn('status', ['diambil'])->count();
         $totalCustomers = Customer::count();
-        $totalLaundryMasuk = Transaction::count();
+        
+        $transactionsQuery = Transaction::query();
+        $txRange = $request->query('transactions_range', 'all');
+        if ($txRange === 'today') {
+            $transactionsQuery->whereDate('created_at', now()->toDateString());
+        } elseif ($txRange === '7days') {
+            $transactionsQuery->where('created_at', '>=', now()->subDays(7));
+        } elseif ($txRange === 'month') {
+            $transactionsQuery->whereMonth('created_at', now()->month)
+                              ->whereYear('created_at', now()->year);
+        }
+        $totalLaundryMasuk = $transactionsQuery->count();
         
         $recentTransactions = Transaction::with(['customer.user', 'service'])
             ->latest()

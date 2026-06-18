@@ -600,6 +600,35 @@ class TransactionController extends Controller
     }
 
     /**
+     * Transactions report (Total Transactions with time filtering).
+     */
+    public function transactionsReport(Request $request)
+    {
+        $query = Transaction::query();
+
+        $range = $request->query('range', 'all');
+        if ($range === 'today') {
+            $query->whereDate('created_at', now()->toDateString());
+        } elseif ($range === '7days') {
+            $query->where('created_at', '>=', now()->subDays(7));
+        } elseif ($range === 'month') {
+            $query->whereMonth('created_at', now()->month)
+                  ->whereYear('created_at', now()->year);
+        }
+
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $query->whereDate('created_at', '>=', $request->query('start_date'))
+                  ->whereDate('created_at', '<=', $request->query('end_date'));
+        }
+
+        $totalTransactions = $query->count();
+
+        return response()->json([
+            'total_transactions' => $totalTransactions,
+        ]);
+    }
+
+    /**
      * Print receipt (PDF).
      */
     public function printReceipt(Transaction $transaction)

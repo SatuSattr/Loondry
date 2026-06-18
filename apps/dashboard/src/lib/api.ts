@@ -107,9 +107,10 @@ export const api = {
   },
   
   // Dashboard
-  getDashboard: (revenueRange?: string, startDate?: string, endDate?: string) => {
+  getDashboard: (revenueRange?: string, transactionsRange?: string, startDate?: string, endDate?: string) => {
     const params = new URLSearchParams();
     if (revenueRange) params.append('revenue_range', revenueRange);
+    if (transactionsRange) params.append('transactions_range', transactionsRange);
     if (startDate) params.append('start_date', startDate);
     if (endDate) params.append('end_date', endDate);
     const queryString = params.toString();
@@ -185,6 +186,14 @@ export const api = {
   // Reports
   getRevenueReport: () => request('/reports/revenue'),
   getStatisticsReport: () => request('/reports/statistics'),
+  getTransactionsReport: (range?: string, startDate?: string, endDate?: string) => {
+    const params = new URLSearchParams();
+    if (range) params.append('range', range);
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    const queryString = params.toString();
+    return request(`/reports/transactions${queryString ? `?${queryString}` : ''}`);
+  },
 
   // Notifications
   sendTargetedNotification: (data: any) => request('/admin/notifications', { method: 'POST', body: data }),

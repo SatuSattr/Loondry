@@ -37,9 +37,11 @@ interface DashboardViewProps {
 
 export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer, onOpenShortcuts, onOpenSendNotification }: DashboardViewProps) {
   const [revenueRange, setRevenueRange] = useState('all');
+  const [transactionsRange, setTransactionsRange] = useState('all');
   const [data, setData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [revenueLoading, setRevenueLoading] = useState(false);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
   const [error, setError] = useState('');
   const [isInitialMount, setIsInitialMount] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
@@ -59,21 +61,23 @@ export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer, onOpenS
     return `${year}-${month}-${day}`;
   };
 
-  const loadDashboardData = async (rangeVal = 'all', isSilent = false, start?: string, end?: string) => {
+  const loadDashboardData = async (revRangeVal = 'all', txRangeVal = 'all', isSilent = false, start?: string, end?: string) => {
     if (isSilent) {
       setRevenueLoading(true);
+      setTransactionsLoading(true);
     } else {
       setLoading(true);
     }
     setError('');
     try {
-      const res = await api.getDashboard(rangeVal, start, end);
+      const res = await api.getDashboard(revRangeVal, txRangeVal, start, end);
       setData(res);
     } catch (err: any) {
       setError(err.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
       setRevenueLoading(false);
+      setTransactionsLoading(false);
     }
   };
 
@@ -82,12 +86,12 @@ export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer, onOpenS
     const end = dateRange?.to ? formatDate(dateRange.to) : undefined;
     
     if (isInitialMount) {
-      loadDashboardData(revenueRange, false, start, end);
+      loadDashboardData(revenueRange, transactionsRange, false, start, end);
       setIsInitialMount(false);
     } else {
-      loadDashboardData(revenueRange, true, start, end);
+      loadDashboardData(revenueRange, transactionsRange, true, start, end);
     }
-  }, [revenueRange]);
+  }, [revenueRange, transactionsRange]);
 
   useEffect(() => {
     if (isInitialMount) return;
@@ -96,7 +100,7 @@ export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer, onOpenS
     const end = dateRange?.to ? formatDate(dateRange.to) : undefined;
     
     if (!dateRange || (dateRange.from && dateRange.to) || (!dateRange.from && !dateRange.to)) {
-      loadDashboardData(revenueRange, true, start, end);
+      loadDashboardData(revenueRange, transactionsRange, true, start, end);
     }
   }, [dateRange]);
 
@@ -116,7 +120,7 @@ export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer, onOpenS
           onClick={() => {
             const start = dateRange?.from ? formatDate(dateRange.from) : undefined;
             const end = dateRange?.to ? formatDate(dateRange.to) : undefined;
-            loadDashboardData(revenueRange, false, start, end);
+            loadDashboardData(revenueRange, transactionsRange, false, start, end);
           }}
           className="bg-destructive/20 hover:bg-destructive/35 px-3 py-1 rounded text-xs transition-colors cursor-pointer"
         >
@@ -157,7 +161,7 @@ export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer, onOpenS
             onClick={() => {
               const start = dateRange?.from ? formatDate(dateRange.from) : undefined;
               const end = dateRange?.to ? formatDate(dateRange.to) : undefined;
-              loadDashboardData(revenueRange, false, start, end);
+              loadDashboardData(revenueRange, transactionsRange, false, start, end);
             }}
             className="p-2 border border-border bg-background hover:bg-accent rounded-lg text-foreground transition-all cursor-pointer"
             title="Refresh dashboard stats"
@@ -235,7 +239,46 @@ export function DashboardView({ onOpenCreateOrder, onOpenCreateCustomer, onOpenS
           title="Total Transactions"
           value={`${summary?.total_laundry_masuk || 0}`}
           status="unknown"
-          range="All Transactions"
+          range={rangeLabels[transactionsRange]}
+          action={
+            <div className="relative inline-block">
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={transactionsLoading}
+                      className="h-7 text-[10px] font-bold text-foreground px-2 cursor-pointer border-border bg-background hover:bg-accent flex items-center"
+                    >
+                      {transactionsLoading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1 text-foreground" />
+                      ) : (
+                        <CalendarIcon className="h-3.5 w-3.5 mr-1" />
+                      )}
+                      <span>{rangeLabels[transactionsRange]}</span>
+                      <ChevronDown className="h-3 w-3 ml-1 text-muted-foreground" />
+                    </Button>
+                  }
+                />
+                  <DropdownMenuContent align="end" className="w-36 bg-card border border-border rounded-xl shadow-lg z-50 overflow-hidden py-1">
+                    {Object.entries(rangeLabels).map(([key, val]) => (
+                      <DropdownMenuItem
+                        key={key}
+                        onClick={() => setTransactionsRange(key)}
+                        className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent/80 cursor-pointer ${
+                          transactionsRange === key
+                            ? 'bg-primary/10 text-primary font-semibold'
+                            : 'text-foreground'
+                        }`}
+                      >
+                        {val}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
+          }
         />
 
         {/* Active Orders */}

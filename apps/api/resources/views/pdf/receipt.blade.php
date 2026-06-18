@@ -1,8 +1,16 @@
+@php
+    $logoPath = public_path('assets/loondry-logo-colored.png');
+    $logoBase64 = '';
+    if (file_exists($logoPath)) {
+        $logoBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));
+    }
+@endphp
 <!DOCTYPE html>
 <html>
 <head>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #2D3748; margin: 0; padding: 20px; font-size: 12px; }
+        body { font-family: 'Geist', 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #2D3748; margin: 0; padding: 20px; font-size: 12px; }
         .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #EDF2F7; padding-bottom: 20px; }
         .logo { width: 80px; margin-bottom: 10px; }
         .business-name { font-size: 24px; font-weight: bold; color: #2B6CB0; margin: 0; text-transform: uppercase; }
@@ -27,7 +35,11 @@
 </head>
 <body>
     <div class="header">
-        <img src="{{ public_path('assets/loondry-logo-colored.png') }}" class="logo">
+        @if ($logoBase64)
+            <img src="{{ $logoBase64 }}" class="logo">
+        @else
+            <img src="{{ public_path('assets/loondry-logo-colored.png') }}" class="logo">
+        @endif
         <h1 class="business-name">Loondry</h1>
         <p class="business-address">
             Jl. Poras No.07, RT.01/RW.04, Loji, Kec. Bogor Bar.,<br>
@@ -93,8 +105,16 @@
             <div style="clear: both;"></div>
         </div>
 @endif
-        <div class="total-row grand-total">
-            <span style="float: left;">LUNAS</span>
+        <div class="total-row grand-total" style="color: {{ $transaction->payment_status === 'paid' ? '#2F855A' : ($transaction->payment_status === 'pending_confirmation' ? '#D69E2E' : '#C53030') }}; border-top: 2px solid {{ $transaction->payment_status === 'paid' ? '#2F855A' : ($transaction->payment_status === 'pending_confirmation' ? '#D69E2E' : '#C53030') }};">
+            <span style="float: left;">
+                @if ($transaction->payment_status === 'paid')
+                    LUNAS
+                @elseif ($transaction->payment_status === 'pending_confirmation')
+                    PENDING KONFIRMASI
+                @else
+                    BELUM LUNAS
+                @endif
+            </span>
             <span style="float: right;">Rp {{ number_format($transaction->total_price - $transaction->discount, 0, ',', '.') }}</span>
             <div style="clear: both;"></div>
         </div>

@@ -56,3 +56,31 @@ GET /api/reports/statistics
 ```
 
 > Groups all transactions by `DATE(created_at)`. Includes all transactions regardless of payment status. Ordered by date descending.
+
+---
+
+## Transactions Report
+
+Get total transaction count from all transactions, optionally filtered by range or specific dates.
+
+```
+GET /api/reports/transactions
+```
+
+**Auth:** Bearer token (admin)
+
+### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `range` | string | No | Time range filter. Allowed values: `today`, `7days`, `month`, `all` (default). |
+| `start_date` | string (YYYY-MM-DD) | No | Custom start date. Requires `end_date` to be specified as well. |
+| `end_date` | string (YYYY-MM-DD) | No | Custom end date. Requires `start_date` to be specified as well. |
+
+### Response `200 OK`
+
+```json
+{
+  "total_transactions": 25
+}
+```

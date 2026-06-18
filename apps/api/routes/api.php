@@ -37,6 +37,7 @@ Route::middleware('auth:sanctum')->group(function () {
         
         Route::get('/reports/revenue', [TransactionController::class, 'revenueReport']);
         Route::get('/reports/statistics', [TransactionController::class, 'statisticsReport']);
+        Route::get('/reports/transactions', [TransactionController::class, 'transactionsReport']);
 
         Route::apiResource('vouchers-templates', VoucherController::class)->parameters([
             'vouchers-templates' => 'voucher'
