@@ -580,7 +580,7 @@ class TransactionController extends Controller
         $totalRevenue = Transaction::where('payment_status', 'paid')->sum('total_price');
 
         return response()->json([
-            'total_revenue' => $totalRevenue,
+            'total_revenue' => (float) $totalRevenue,
         ]);
     }
 
