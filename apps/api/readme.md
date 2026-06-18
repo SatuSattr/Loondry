@@ -83,3 +83,60 @@ Each endpoint group is documented in a separate file under the `documentation/` 
 | POST | `/api/admin/notifications` | Sanctum | admin |
 | GET | `/api/notifications` | Sanctum | - |
 | POST | `/api/notifications/{notification}/read` | Sanctum | - |
+
+---
+
+## Docker Deployment
+
+### 1. Local Development & Testing (Docker Compose)
+You can run the API, database, and phpMyAdmin locally using Docker Compose:
+
+```bash
+# Navigate to the API directory
+cd apps/api
+
+# Build and start the containers in the background
+docker compose up -d --build
+```
+
+#### Services Started:
+* **API Application:** `http://localhost:8000` (Nginx + PHP 8.4 FPM)
+* **MySQL Database:** Local port `33060` (Mapped to internal container port `3306`)
+* **phpMyAdmin:** `http://localhost:8080` (Manage your database easily)
+
+> [!NOTE]
+> When the containers boot, the entrypoint script automatically runs database migrations and seeds the database with initial admin credentials and transaction mock data.
+
+To stop the containers:
+```bash
+docker compose down
+```
+
+---
+
+### 2. Production Deployment (e.g. Coolify)
+To deploy this API via a Dockerfile in a production dashboard like Coolify:
+
+#### Build Configurations:
+* **Base Directory:** `apps/api`
+* **Dockerfile Path:** `Dockerfile` (Relative to Base Directory)
+* **Build Context:** `apps/api`
+
+#### Required Environment Variables:
+Make sure to define the following environment variables in your deployment dashboard:
+
+| Variable | Value/Description |
+|----------|-------------------|
+| `APP_KEY` | Generate a secure 32-character key |
+| `APP_ENV` | `production` |
+| `APP_DEBUG` | `false` |
+| `DB_CONNECTION` | `mysql` |
+| `DB_HOST` | Host name of your production database container |
+| `DB_PORT` | `3306` |
+| `DB_DATABASE` | Your database name |
+| `DB_USERNAME` | Your database username |
+| `DB_PASSWORD` | Your database password |
+
+> [!TIP]
+> The Docker image is optimized for production. It uses a PHP 8.4-FPM alpine container, does not bundle dev dependencies, and automatically runs `php artisan migrate --force --seed` at launch to keep the database schema up to date.
+
